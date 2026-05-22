@@ -41,3 +41,5 @@ pub mod property;
 pub use property::{
     read_properties, read_property, Property, PropertyBag, PropertyValue, UnsupportedHit,
 };
+pub mod entity_body;
+pub use entity_body::{parse_entity_body, EntityBody};
