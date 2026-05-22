@@ -7,8 +7,11 @@
 //! - `read_body_envelope`: walk the body's outer structure (P1.2-b1)
 //! - `stream_actors`: iterate every (object header + entity body) pair across all
 //!   levels — zero-copy slices into the decompressed body (P1.2-b2)
+//! - `parse_entity_body`: decode actor preamble + primitive properties from an
+//!   entity body; composite property types stop iteration cleanly (P1.3-a)
 //!
-//! Roadmap: P1.3 adds typed component decoding of the entity property-bag bytes.
+//! Roadmap: P1.3-b adds composite property types (Struct, Array, Map, Set, Enum,
+//! Byte, Text). P1.3-c adds the `ClassDef` registry and the `Component` trait.
 
 // modules added in later tasks
 pub mod error;
