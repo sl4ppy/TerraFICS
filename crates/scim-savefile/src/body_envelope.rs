@@ -415,4 +415,91 @@ mod tests {
         assert_eq!(pd.levels[1].name, "SubLevel2");
         assert_eq!(pd.levels[1].level_hex, 0x5555_6666);
     }
+
+    #[test]
+    fn walks_two_sublevels_plus_main_at_save_version_46() {
+        let objects_a = vec![0x10_u8; 4];
+        let entities_a = vec![0x11_u8; 6];
+        let objects_b = vec![0x20_u8; 8];
+        let entities_b = vec![0x21_u8; 12];
+        let objects_main = vec![0x30_u8; 5];
+        let entities_main = vec![0x31_u8; 7];
+
+        let mut body = Vec::new();
+        body.extend_from_slice(&0_u64.to_le_bytes()); // length prefix
+        body.extend_from_slice(&2_i32.to_le_bytes()); // nb_levels = 2
+
+        // Sub-level A
+        write_ascii(&mut body, "SubA");
+        body.extend_from_slice(&i64::try_from(objects_a.len()).unwrap().to_le_bytes());
+        body.extend_from_slice(&objects_a);
+        body.extend_from_slice(&i64::try_from(entities_a.len()).unwrap().to_le_bytes());
+        body.extend_from_slice(&entities_a);
+
+        // Sub-level B
+        write_ascii(&mut body, "SubB");
+        body.extend_from_slice(&i64::try_from(objects_b.len()).unwrap().to_le_bytes());
+        body.extend_from_slice(&objects_b);
+        body.extend_from_slice(&i64::try_from(entities_b.len()).unwrap().to_le_bytes());
+        body.extend_from_slice(&entities_b);
+
+        // Main level (no name in stream)
+        body.extend_from_slice(&i64::try_from(objects_main.len()).unwrap().to_le_bytes());
+        body.extend_from_slice(&objects_main);
+        body.extend_from_slice(&i64::try_from(entities_main.len()).unwrap().to_le_bytes());
+        body.extend_from_slice(&entities_main);
+
+        let header = synth_header(46, false, "MyMap");
+        let env = read_body_envelope(&body, &header).unwrap();
+        assert_eq!(env.levels.len(), 3);
+        assert_eq!(env.levels[0].name, "SubA");
+        assert_eq!(env.levels[0].save_version, 46);
+        assert_eq!(env.levels[1].name, "SubB");
+        assert_eq!(env.levels[2].name, "Level MyMap");
+        // Sanity-check byte-range lengths
+        assert_eq!(env.levels[0].objects_byte_range.len(), 4);
+        assert_eq!(env.levels[0].entities_byte_range.len(), 6);
+        assert_eq!(env.levels[1].objects_byte_range.len(), 8);
+        assert_eq!(env.levels[1].entities_byte_range.len(), 12);
+        assert_eq!(env.levels[2].objects_byte_range.len(), 5);
+        assert_eq!(env.levels[2].entities_byte_range.len(), 7);
+    }
+
+    #[test]
+    fn sub_level_save_version_discovered_via_leap_of_faith_at_save_version_52() {
+        // For save_version >= 51, sub-levels have a trailing u32 with the per-sublevel
+        // save_version. We use 49 (an arbitrary plausible value) here.
+        let objects = vec![0xAA_u8; 4];
+        let entities = vec![0xBB_u8; 6];
+        let objects_main = vec![0x30_u8; 2];
+        let entities_main = vec![0x31_u8; 2];
+
+        let mut body = Vec::new();
+        body.extend_from_slice(&0_u64.to_le_bytes()); // length prefix
+        body.extend_from_slice(&1_i32.to_le_bytes()); // nb_levels = 1
+
+        // Sub-level
+        write_ascii(&mut body, "SubA");
+        body.extend_from_slice(&i64::try_from(objects.len()).unwrap().to_le_bytes());
+        body.extend_from_slice(&objects);
+        body.extend_from_slice(&i64::try_from(entities.len()).unwrap().to_le_bytes());
+        body.extend_from_slice(&entities);
+        body.extend_from_slice(&49_u32.to_le_bytes()); // trailing per-sublevel save_version
+
+        // Main level
+        body.extend_from_slice(&i64::try_from(objects_main.len()).unwrap().to_le_bytes());
+        body.extend_from_slice(&objects_main);
+        body.extend_from_slice(&i64::try_from(entities_main.len()).unwrap().to_le_bytes());
+        body.extend_from_slice(&entities_main);
+
+        let header = synth_header(52, false, "MyMap");
+        let env = read_body_envelope(&body, &header).unwrap();
+        assert_eq!(env.levels.len(), 2);
+        assert_eq!(env.levels[0].name, "SubA");
+        assert_eq!(env.levels[0].save_version, 49,
+            "leap of faith should have discovered the sub-level's save_version");
+        assert_eq!(env.levels[1].name, "Level MyMap");
+        assert_eq!(env.levels[1].save_version, 52,
+            "main level uses header.save_version directly");
+    }
 }
