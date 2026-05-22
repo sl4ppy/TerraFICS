@@ -3,7 +3,7 @@
 
 use thiserror::Error;
 
-#[derive(Debug, Error)]
+#[derive(Debug, Clone, Error)]
 pub enum Error {
     #[error("unexpected EOF: wanted {wanted} bytes, only {available} available at offset {at}")]
     UnexpectedEof {
@@ -12,8 +12,8 @@ pub enum Error {
         at: usize,
     },
 
-    #[error("unsupported save_header_type {0} (only 0..=99 are recognized)")]
-    UnsupportedHeaderType(i32),
+    #[error("unsupported save_header_type {found} (only 0..=99 are recognized)")]
+    UnsupportedHeaderType { found: i32 },
 
     #[error("invalid UTF-8 in string at offset {at}: {source}")]
     InvalidUtf8 {
@@ -26,6 +26,8 @@ pub enum Error {
     InvalidUtf16 { at: usize },
 }
 
+#[allow(unused_attributes)] // #[must_use] on type alias is not yet enforced by this rustc version but documents intent
+#[must_use]
 pub type Result<T> = std::result::Result<T, Error>;
 
 #[cfg(test)]
@@ -43,7 +45,7 @@ mod tests {
 
     #[test]
     fn unsupported_header_type_message_includes_value() {
-        let e = Error::UnsupportedHeaderType(123);
+        let e = Error::UnsupportedHeaderType { found: 123 };
         assert!(e.to_string().contains("123"), "should include the bad value");
     }
 }
