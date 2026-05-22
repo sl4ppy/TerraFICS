@@ -75,4 +75,78 @@ mod tests {
         let result = read_body(&[], 46).unwrap();
         assert!(result.is_empty());
     }
+
+    /// Build a body with N chunks, each containing `payload`.
+    fn n_chunks(payload: &[u8], n: usize) -> Vec<u8> {
+        let single = one_chunk(payload);
+        let mut b = Vec::with_capacity(single.len() * n);
+        for _ in 0..n {
+            b.extend_from_slice(&single);
+        }
+        b
+    }
+
+    #[test]
+    fn read_body_three_chunks_concatenates() {
+        let payload = b"chunk content".repeat(50);
+        let body = n_chunks(&payload, 3);
+        let result = read_body(&body, 46).unwrap();
+        // Result is payload * 3
+        assert_eq!(result.len(), payload.len() * 3);
+        assert_eq!(&result[..payload.len()], payload.as_slice());
+        assert_eq!(&result[payload.len()..2 * payload.len()], payload.as_slice());
+        assert_eq!(&result[2 * payload.len()..], payload.as_slice());
+    }
+
+    #[test]
+    fn read_body_corrupt_zlib_returns_zlib_inflate_error() {
+        // Build a chunk where the "compressed" bytes are not actually valid zlib.
+        let bogus = vec![0xFF_u8; 32];
+        let mut b = Vec::new();
+        b.extend_from_slice(&0x9E2A_83C1_u64.to_le_bytes());
+        b.extend_from_slice(&0x20000_u64.to_le_bytes());
+        b.push(COMPRESSION_FORMAT_ZLIB);
+        b.extend_from_slice(&(u64::try_from(bogus.len()).unwrap()).to_le_bytes()); // compressed
+        b.extend_from_slice(&100_u64.to_le_bytes());              // claimed uncompressed
+        b.extend_from_slice(&(u64::try_from(bogus.len()).unwrap()).to_le_bytes());
+        b.extend_from_slice(&100_u64.to_le_bytes());
+        b.extend_from_slice(&bogus);
+        let err = read_body(&b, 46).unwrap_err();
+        assert!(matches!(err, Error::ZlibInflate { at: 0, .. }));
+    }
+
+    #[test]
+    fn read_body_chunk_length_mismatch() {
+        // Build a chunk where the chunk header CLAIMS 1000 uncompressed bytes
+        // but the actual compressed payload only inflates to 13.
+        let payload = b"hello, world!"; // 13 bytes
+        let compressed = compress_to_vec_zlib(payload, 6);
+        let mut b = Vec::new();
+        b.extend_from_slice(&0x9E2A_83C1_u64.to_le_bytes());
+        b.extend_from_slice(&0x20000_u64.to_le_bytes());
+        b.push(COMPRESSION_FORMAT_ZLIB);
+        b.extend_from_slice(&(u64::try_from(compressed.len()).unwrap()).to_le_bytes());
+        b.extend_from_slice(&1000_u64.to_le_bytes());  // LIES: claims 1000 uncompressed
+        b.extend_from_slice(&(u64::try_from(compressed.len()).unwrap()).to_le_bytes());
+        b.extend_from_slice(&1000_u64.to_le_bytes());
+        b.extend_from_slice(&compressed);
+        let err = read_body(&b, 46).unwrap_err();
+        assert!(matches!(err, Error::ChunkLengthMismatch { expected: 1000, actual: 13, .. }));
+    }
+
+    #[test]
+    fn read_body_truncated_chunk_payload() {
+        // Build a chunk header that says compressed = 1000, but only provide 5 bytes.
+        let mut b = Vec::new();
+        b.extend_from_slice(&0x9E2A_83C1_u64.to_le_bytes());
+        b.extend_from_slice(&0x20000_u64.to_le_bytes());
+        b.push(COMPRESSION_FORMAT_ZLIB);
+        b.extend_from_slice(&1000_u64.to_le_bytes());
+        b.extend_from_slice(&500_u64.to_le_bytes());
+        b.extend_from_slice(&1000_u64.to_le_bytes());
+        b.extend_from_slice(&500_u64.to_le_bytes());
+        b.extend_from_slice(&[0_u8; 5]); // way short of 1000
+        let err = read_body(&b, 46).unwrap_err();
+        assert!(matches!(err, Error::UnexpectedEof { wanted: 1000, .. }));
+    }
 }
