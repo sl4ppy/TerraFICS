@@ -157,5 +157,31 @@ fn parse_one(path: &Path) -> Result<Outcome, String> {
         body.len()
     );
 
+    // Walk the body envelope (P1.2-b1).
+    match scim_savefile::read_body_envelope(&body, &header) {
+        Ok(env) => {
+            eprintln!(
+                "      envelope: {} level(s), partitions={}",
+                env.levels.len(),
+                env.partitions.is_some(),
+            );
+            for level in &env.levels {
+                eprintln!(
+                    "        - {} (save_version={}): objects={} B, entities={} B",
+                    level.name,
+                    level.save_version,
+                    level.objects_byte_range.len(),
+                    level.entities_byte_range.len(),
+                );
+            }
+        }
+        Err(scim_savefile::Error::UnsupportedSaveVersion { found }) => {
+            eprintln!("      envelope: skipped (unsupported save_version {found})");
+        }
+        Err(e) => {
+            return Err(format!("envelope walk: {e}"));
+        }
+    }
+
     Ok(Outcome::Parsed)
 }
