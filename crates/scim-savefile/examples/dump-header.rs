@@ -71,5 +71,22 @@ fn main() -> ExitCode {
     if let Some(v) = h.is_creative_mode_enabled {
         println!("is_creative_mode:    {v}");
     }
+
+    // Decompress the body so we can also report its size.
+    match scim_savefile::read_body(&bytes[consumed..], h.save_version) {
+        Ok(body) => {
+            println!("body_compressed:     {} bytes", bytes.len() - consumed);
+            println!("body_decompressed:   {} bytes", body.len());
+            let compressed = bytes.len() - consumed;
+            #[allow(clippy::cast_precision_loss)] // display-only ratio
+            let ratio = body.len() as f64 / compressed.max(1) as f64;
+            println!("expansion_ratio:     {ratio:.2}x");
+        }
+        Err(e) => {
+            eprintln!("warning: body decompression failed: {e}");
+            // Don't fail the example for a body issue — the header still parsed.
+        }
+    }
+
     ExitCode::SUCCESS
 }
