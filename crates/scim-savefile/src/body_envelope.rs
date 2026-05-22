@@ -59,9 +59,9 @@ pub struct PartitionLevel {
 fn read_partitions(r: &mut Reader<'_>) -> Result<Partitions> {
     let partition_count = r.read_i32()?;
     r.read_string()?; // skip None marker
-    r.read_u32()?;    // skip zero uint
+    r.read_u32()?; // skip zero uint
     let head_hex_1 = r.read_u32()?;
-    r.read_i32()?;    // skip one int
+    r.read_i32()?; // skip one int
     r.read_string()?; // skip None marker
     let head_hex_2 = r.read_u32()?;
 
@@ -77,13 +77,25 @@ fn read_partitions(r: &mut Reader<'_>) -> Result<Partitions> {
         for _ in 0..nb_levels {
             let level_name = r.read_string()?;
             let level_hex = r.read_u32()?;
-            levels.push(PartitionLevel { name: level_name, level_hex });
+            levels.push(PartitionLevel {
+                name: level_name,
+                level_hex,
+            });
         }
 
-        data.push(PartitionData { name, grid_hex, count, levels });
+        data.push(PartitionData {
+            name,
+            grid_hex,
+            count,
+            levels,
+        });
     }
 
-    Ok(Partitions { head_hex_1, head_hex_2, data })
+    Ok(Partitions {
+        head_hex_1,
+        head_hex_2,
+        data,
+    })
 }
 
 /// Consume the `countCollected` i32 and any following collectable records.
@@ -144,8 +156,8 @@ fn read_level_scaffold(
         }
         r.seek(entities_pos);
         let entities_binary_length = r.read_i64()?;
-        let entities_binary_length_usize = usize::try_from(entities_binary_length)
-            .map_err(|_| Error::ChunkLengthMismatch {
+        let entities_binary_length_usize =
+            usize::try_from(entities_binary_length).map_err(|_| Error::ChunkLengthMismatch {
                 at: r.position(),
                 expected: u64::try_from(entities_binary_length).unwrap_or(0),
                 actual: 0,
@@ -191,8 +203,8 @@ fn read_level_scaffold(
     r.seek(objects_end);
 
     let entities_binary_length = r.read_i64()?;
-    let entities_binary_length_usize = usize::try_from(entities_binary_length)
-        .map_err(|_| Error::ChunkLengthMismatch {
+    let entities_binary_length_usize =
+        usize::try_from(entities_binary_length).map_err(|_| Error::ChunkLengthMismatch {
             at: r.position(),
             expected: u64::try_from(entities_binary_length).unwrap_or(0),
             actual: 0,
@@ -259,12 +271,20 @@ pub fn read_body_envelope<'a>(body_bytes: &'a [u8], header: &Header) -> Result<B
     let nb_levels = r.read_i32()?;
     let mut levels = Vec::with_capacity(usize::try_from(nb_levels.max(0)).unwrap_or(0) + 1);
     for _ in 0..nb_levels {
-        levels.push(read_level_scaffold(&mut r, header, /* is_main_level */ false)?);
+        levels.push(read_level_scaffold(
+            &mut r, header, /* is_main_level */ false,
+        )?);
     }
     // The implicit main level always follows the explicit sub-levels.
-    levels.push(read_level_scaffold(&mut r, header, /* is_main_level */ true)?);
+    levels.push(read_level_scaffold(
+        &mut r, header, /* is_main_level */ true,
+    )?);
 
-    Ok(BodyEnvelope { partitions, levels, body_bytes })
+    Ok(BodyEnvelope {
+        partitions,
+        levels,
+        body_bytes,
+    })
 }
 
 #[cfg(test)]
@@ -318,7 +338,7 @@ mod tests {
         let mut body = Vec::new();
         body.extend_from_slice(&0_u64.to_le_bytes()); // length prefix
         body.extend_from_slice(&0_i32.to_le_bytes()); // nb_levels = 0
-        // Minimal main level: objects_binary_length=0, entities_binary_length=0
+                                                      // Minimal main level: objects_binary_length=0, entities_binary_length=0
         body.extend_from_slice(&0_i64.to_le_bytes()); // objects_binary_length
         body.extend_from_slice(&0_i64.to_le_bytes()); // entities_binary_length
         let header = synth_header(46, false, "Persistent_Level");
@@ -332,7 +352,7 @@ mod tests {
         let mut body = Vec::new();
         body.extend_from_slice(&0_u64.to_le_bytes()); // length prefix
         body.extend_from_slice(&0_i32.to_le_bytes()); // nb_levels = 0
-        // Minimal main level: objects_binary_length=0, entities_binary_length=0
+                                                      // Minimal main level: objects_binary_length=0, entities_binary_length=0
         body.extend_from_slice(&0_i64.to_le_bytes()); // objects_binary_length
         body.extend_from_slice(&0_i64.to_le_bytes()); // entities_binary_length
         let header = synth_header(46, /* is_partitioned */ false, "Persistent_Level");
@@ -346,18 +366,18 @@ mod tests {
         let mut b = Vec::new();
         // partition_count = 2
         b.extend_from_slice(&2_i32.to_le_bytes());
-        write_ascii(&mut b, "None");                  // skipped string
-        b.extend_from_slice(&0_u32.to_le_bytes());    // skipped uint = 0
+        write_ascii(&mut b, "None"); // skipped string
+        b.extend_from_slice(&0_u32.to_le_bytes()); // skipped uint = 0
         b.extend_from_slice(&0xCAFE_BABE_u32.to_le_bytes()); // head_hex_1
-        b.extend_from_slice(&1_i32.to_le_bytes());    // skipped int = 1
-        write_ascii(&mut b, "None");                  // skipped string
+        b.extend_from_slice(&1_i32.to_le_bytes()); // skipped int = 1
+        write_ascii(&mut b, "None"); // skipped string
         b.extend_from_slice(&0xDEAD_BEEF_u32.to_le_bytes()); // head_hex_2
 
         // One partition data block (partition_count - 1 = 1 iteration)
         write_ascii(&mut b, "MainGrid");
         b.extend_from_slice(&0x1111_2222_u32.to_le_bytes()); // grid_hex
-        b.extend_from_slice(&5_u32.to_le_bytes());           // count
-        b.extend_from_slice(&2_i32.to_le_bytes());           // nb_levels = 2
+        b.extend_from_slice(&5_u32.to_le_bytes()); // count
+        b.extend_from_slice(&2_i32.to_le_bytes()); // nb_levels = 2
 
         // 2 sub-level entries
         write_ascii(&mut b, "SubLevel1");
@@ -404,11 +424,17 @@ mod tests {
         // After 8-byte length prefix + 4-byte nb_levels + 8-byte objects_binary_length:
         let expected_objects_start = 8 + 4 + 8;
         let expected_objects_end = expected_objects_start + objects.len();
-        assert_eq!(main.objects_byte_range, expected_objects_start..expected_objects_end);
+        assert_eq!(
+            main.objects_byte_range,
+            expected_objects_start..expected_objects_end
+        );
         // After objects block + 8-byte entities_binary_length:
         let expected_entities_start = expected_objects_end + 8;
         let expected_entities_end = expected_entities_start + entities.len();
-        assert_eq!(main.entities_byte_range, expected_entities_start..expected_entities_end);
+        assert_eq!(
+            main.entities_byte_range,
+            expected_entities_start..expected_entities_end
+        );
     }
 
     #[test]
@@ -417,7 +443,7 @@ mod tests {
         body.extend_from_slice(&0_u64.to_le_bytes()); // length prefix
         body.extend_from_slice(&synth_partitions_block());
         body.extend_from_slice(&0_i32.to_le_bytes()); // nb_levels = 0
-        // Minimal main level: objects_binary_length=0, entities_binary_length=0
+                                                      // Minimal main level: objects_binary_length=0, entities_binary_length=0
         body.extend_from_slice(&0_i64.to_le_bytes()); // objects_binary_length
         body.extend_from_slice(&0_i64.to_le_bytes()); // entities_binary_length
         let header = synth_header(46, /* is_partitioned */ true, "Persistent_Level");
@@ -520,10 +546,14 @@ mod tests {
         let env = read_body_envelope(&body, &header).unwrap();
         assert_eq!(env.levels.len(), 2);
         assert_eq!(env.levels[0].name, "SubA");
-        assert_eq!(env.levels[0].save_version, 49,
-            "leap of faith should have discovered the sub-level's save_version");
+        assert_eq!(
+            env.levels[0].save_version, 49,
+            "leap of faith should have discovered the sub-level's save_version"
+        );
         assert_eq!(env.levels[1].name, "Level MyMap");
-        assert_eq!(env.levels[1].save_version, 52,
-            "main level uses header.save_version directly");
+        assert_eq!(
+            env.levels[1].save_version, 52,
+            "main level uses header.save_version directly"
+        );
     }
 }

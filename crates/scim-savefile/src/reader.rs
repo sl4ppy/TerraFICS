@@ -315,7 +315,14 @@ mod tests {
         assert_eq!(r.remaining(), 0);
         // Subsequent read fails cleanly with EOF
         let err = r.read_u8().unwrap_err();
-        assert!(matches!(err, Error::UnexpectedEof { wanted: 1, available: 0, at: 3 }));
+        assert!(matches!(
+            err,
+            Error::UnexpectedEof {
+                wanted: 1,
+                available: 0,
+                at: 3
+            }
+        ));
     }
 
     #[test]
@@ -343,6 +350,13 @@ mod tests {
     fn read_u32_at_eof_errors() {
         let mut r = Reader::new(&[0x00, 0x01, 0x02]);
         let err = r.read_u32().unwrap_err();
-        assert!(matches!(err, Error::UnexpectedEof { wanted: 4, available: 3, at: 0 }));
+        assert!(matches!(
+            err,
+            Error::UnexpectedEof {
+                wanted: 4,
+                available: 3,
+                at: 0
+            }
+        ));
     }
 }

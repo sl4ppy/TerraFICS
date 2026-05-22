@@ -17,8 +17,7 @@ fn creative_test_sav_envelope_walks() {
         .expect("missing fixture: tests/corpus/CREATIVE TEST.sav");
 
     let (header, consumed) = read_header(&bytes).expect("header should parse");
-    let body = read_body(&bytes[consumed..], header.save_version)
-        .expect("body should decompress");
+    let body = read_body(&bytes[consumed..], header.save_version).expect("body should decompress");
 
     let env = read_body_envelope(&body, &header).expect("envelope should walk");
 
@@ -28,17 +27,27 @@ fn creative_test_sav_envelope_walks() {
     let main = env.levels.last().unwrap();
     assert_eq!(main.name, format!("Level {}", header.map_name));
     assert_eq!(main.save_version, header.save_version);
-    assert!(!main.objects_byte_range.is_empty(),
-        "main level objects block should not be empty");
-    assert!(!main.entities_byte_range.is_empty(),
-        "main level entities block should not be empty");
+    assert!(
+        !main.objects_byte_range.is_empty(),
+        "main level objects block should not be empty"
+    );
+    assert!(
+        !main.entities_byte_range.is_empty(),
+        "main level entities block should not be empty"
+    );
 
     // Every level's byte range must lie within body_bytes.
     for level in &env.levels {
-        assert!(level.objects_byte_range.end <= env.body_bytes.len(),
-            "objects range overflows body for level {}", level.name);
-        assert!(level.entities_byte_range.end <= env.body_bytes.len(),
-            "entities range overflows body for level {}", level.name);
+        assert!(
+            level.objects_byte_range.end <= env.body_bytes.len(),
+            "objects range overflows body for level {}",
+            level.name
+        );
+        assert!(
+            level.entities_byte_range.end <= env.body_bytes.len(),
+            "entities range overflows body for level {}",
+            level.name
+        );
     }
 
     // Print a summary for human inspection (visible with --nocapture).

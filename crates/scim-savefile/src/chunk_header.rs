@@ -132,6 +132,9 @@ mod tests {
         b[16] = 0xFF;
         let mut r = Reader::new(&b);
         let err = read_chunk_header(&mut r, 46).unwrap_err();
-        assert!(matches!(err, Error::UnsupportedCompressionFormat { found: 0xFF }));
+        assert!(matches!(
+            err,
+            Error::UnsupportedCompressionFormat { found: 0xFF }
+        ));
     }
 }
