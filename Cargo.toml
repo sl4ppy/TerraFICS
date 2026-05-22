@@ -1,0 +1,38 @@
+[workspace]
+resolver = "2"
+members  = ["crates/*"]
+
+[workspace.package]
+edition      = "2021"
+rust-version = "1.83"
+version      = "0.1.0"
+authors      = ["Chris Van Doren <chris@thevandorens.com>"]
+license      = "LicenseRef-Proprietary"
+repository   = "https://github.com/sl4ppy/TerraFICS"
+
+[workspace.dependencies]
+thiserror = "1.0"
+serde     = { version = "1.0", features = ["derive"] }
+
+[workspace.lints.rust]
+unsafe_code = "deny"
+missing_debug_implementations = "warn"
+rust_2018_idioms = "warn"
+
+[workspace.lints.clippy]
+all                  = "warn"
+pedantic             = "warn"
+nursery              = "warn"
+# Quieten a few pedantic lints that fight idiomatic Rust:
+module_name_repetitions = "allow"
+missing_errors_doc      = "allow"
+missing_panics_doc      = "allow"
+
+[profile.release]
+lto              = "thin"
+codegen-units    = 1
+strip            = "symbols"
+
+[profile.bench]
+inherits = "release"
+debug    = true

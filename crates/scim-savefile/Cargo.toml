@@ -1,0 +1,14 @@
+[package]
+name         = "scim-savefile"
+edition.workspace      = true
+rust-version.workspace = true
+version.workspace      = true
+authors.workspace      = true
+license.workspace      = true
+
+[dependencies]
+thiserror.workspace = true
+serde     = { workspace = true, features = ["derive"] }
+
+[lints]
+workspace = true

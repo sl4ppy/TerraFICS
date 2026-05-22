@@ -1,0 +1,8 @@
+[alias]
+xtest  = "test --workspace --all-features"
+xlint  = "clippy --workspace --all-targets -- -D warnings"
+xfmt   = "fmt --all"
+
+[build]
+# Speed up incremental builds on Windows
+incremental = true
