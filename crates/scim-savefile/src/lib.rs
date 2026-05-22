@@ -4,10 +4,11 @@
 //! Current capability:
 //! - `read_header`: parse the save-file header (P1.1)
 //! - `read_body`: decompress the zlib-compressed body chunks (P1.2-a)
-//! - `read_body_envelope`: walk the body's outer structure to locate per-level
-//!   objects/entities byte ranges (P1.2-b1)
+//! - `read_body_envelope`: walk the body's outer structure (P1.2-b1)
+//! - `stream_actors`: iterate every (object header + entity body) pair across all
+//!   levels — zero-copy slices into the decompressed body (P1.2-b2)
 //!
-//! Roadmap: P1.2-b2 adds per-level object/actor parsing as a `RawActor` stream.
+//! Roadmap: P1.3 adds typed component decoding of the entity property-bag bytes.
 
 // modules added in later tasks
 pub mod error;
