@@ -288,6 +288,13 @@ mod tests {
     fn read_array_at_eof_errors() {
         let mut r = Reader::new(&[0x01, 0x02]);
         let err = r.read_array::<4>().unwrap_err();
-        assert!(matches!(err, Error::UnexpectedEof { wanted: 4, available: 2, at: 0 }));
+        assert!(matches!(
+            err,
+            Error::UnexpectedEof {
+                wanted: 4,
+                available: 2,
+                at: 0
+            }
+        ));
     }
 }

@@ -27,7 +27,7 @@ pub struct Header {
     pub is_modded_save: Option<i32>,
     pub save_identifier: Option<String>,
     pub is_partitioned_world: Option<i32>,
-    pub save_data_hash: Option<[u8; 20]>,     // >= 13, 20 bytes
+    pub save_data_hash: Option<[u8; 20]>, // >= 13, 20 bytes
     pub is_creative_mode_enabled: Option<i32>,
 }
 

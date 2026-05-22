@@ -3,7 +3,7 @@
 //! Add a new fn here for each fixture in `tests/corpus/`.
 
 use scim_savefile::read_header;
-use scim_savefile::versions::{MIN_SUPPORTED_HEADER_TYPE, MAX_KNOWN_HEADER_TYPE};
+use scim_savefile::versions::{MAX_KNOWN_HEADER_TYPE, MIN_SUPPORTED_HEADER_TYPE};
 use std::path::PathBuf;
 
 fn corpus_path(name: &str) -> PathBuf {

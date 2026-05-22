@@ -81,7 +81,10 @@ mod tests {
         // The zlib header byte 0x00 is invalid, so this will reliably fail.
         let bad: &[u8] = &[0x00];
         let underlying = miniz_oxide::inflate::decompress_to_vec_zlib(bad).unwrap_err();
-        let e = Error::ZlibInflate { at: 12345, source: underlying };
+        let e = Error::ZlibInflate {
+            at: 12345,
+            source: underlying,
+        };
         let s = e.to_string();
         assert!(s.contains("12345"), "should mention offset: {s}");
         assert!(s.contains("zlib"), "should mention 'zlib': {s}");

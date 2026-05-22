@@ -19,10 +19,16 @@ pub fn read_body(body_bytes: &[u8], save_version: i32) -> Result<Vec<u8>> {
     while r.remaining() > 0 {
         let chunk_start = r.position();
         let h = read_chunk_header(&mut r, save_version)?;
-        let compressed = r.read_hex(usize::try_from(h.compressed_size).expect("compressed_size fits usize"))?;
+        let compressed =
+            r.read_hex(usize::try_from(h.compressed_size).expect("compressed_size fits usize"))?;
 
-        let decompressed = miniz_oxide::inflate::decompress_to_vec_zlib(&compressed)
-            .map_err(|source| Error::ZlibInflate { at: chunk_start, source })?;
+        let decompressed =
+            miniz_oxide::inflate::decompress_to_vec_zlib(&compressed).map_err(|source| {
+                Error::ZlibInflate {
+                    at: chunk_start,
+                    source,
+                }
+            })?;
 
         // Sanity: decompressed length should match the chunk's uncompressed_size.
         let actual = u64::try_from(decompressed.len()).expect("usize fits u64");
@@ -50,13 +56,13 @@ mod tests {
         let compressed = compress_to_vec_zlib(payload, 6);
         let mut b = Vec::new();
         // 49-byte chunk header
-        b.extend_from_slice(&0x9E2A_83C1_u64.to_le_bytes());   // package_file_tag
-        b.extend_from_slice(&0x20000_u64.to_le_bytes());       // max_chunk_size
-        b.push(COMPRESSION_FORMAT_ZLIB);                       // compression_format
+        b.extend_from_slice(&0x9E2A_83C1_u64.to_le_bytes()); // package_file_tag
+        b.extend_from_slice(&0x20000_u64.to_le_bytes()); // max_chunk_size
+        b.push(COMPRESSION_FORMAT_ZLIB); // compression_format
         b.extend_from_slice(&(compressed.len() as u64).to_le_bytes()); // compressed
-        b.extend_from_slice(&(payload.len() as u64).to_le_bytes());    // uncompressed
+        b.extend_from_slice(&(payload.len() as u64).to_le_bytes()); // uncompressed
         b.extend_from_slice(&(compressed.len() as u64).to_le_bytes()); // dup
-        b.extend_from_slice(&(payload.len() as u64).to_le_bytes());    // dup
+        b.extend_from_slice(&(payload.len() as u64).to_le_bytes()); // dup
         assert_eq!(b.len(), CHUNK_HEADER_LEN_V41);
         b.extend_from_slice(&compressed);
         b
@@ -94,7 +100,10 @@ mod tests {
         // Result is payload * 3
         assert_eq!(result.len(), payload.len() * 3);
         assert_eq!(&result[..payload.len()], payload.as_slice());
-        assert_eq!(&result[payload.len()..2 * payload.len()], payload.as_slice());
+        assert_eq!(
+            &result[payload.len()..2 * payload.len()],
+            payload.as_slice()
+        );
         assert_eq!(&result[2 * payload.len()..], payload.as_slice());
     }
 
@@ -107,7 +116,7 @@ mod tests {
         b.extend_from_slice(&0x20000_u64.to_le_bytes());
         b.push(COMPRESSION_FORMAT_ZLIB);
         b.extend_from_slice(&(u64::try_from(bogus.len()).unwrap()).to_le_bytes()); // compressed
-        b.extend_from_slice(&100_u64.to_le_bytes());              // claimed uncompressed
+        b.extend_from_slice(&100_u64.to_le_bytes()); // claimed uncompressed
         b.extend_from_slice(&(u64::try_from(bogus.len()).unwrap()).to_le_bytes());
         b.extend_from_slice(&100_u64.to_le_bytes());
         b.extend_from_slice(&bogus);
@@ -126,12 +135,19 @@ mod tests {
         b.extend_from_slice(&0x20000_u64.to_le_bytes());
         b.push(COMPRESSION_FORMAT_ZLIB);
         b.extend_from_slice(&(u64::try_from(compressed.len()).unwrap()).to_le_bytes());
-        b.extend_from_slice(&1000_u64.to_le_bytes());  // LIES: claims 1000 uncompressed
+        b.extend_from_slice(&1000_u64.to_le_bytes()); // LIES: claims 1000 uncompressed
         b.extend_from_slice(&(u64::try_from(compressed.len()).unwrap()).to_le_bytes());
         b.extend_from_slice(&1000_u64.to_le_bytes());
         b.extend_from_slice(&compressed);
         let err = read_body(&b, 46).unwrap_err();
-        assert!(matches!(err, Error::ChunkLengthMismatch { expected: 1000, actual: 13, .. }));
+        assert!(matches!(
+            err,
+            Error::ChunkLengthMismatch {
+                expected: 1000,
+                actual: 13,
+                ..
+            }
+        ));
     }
 
     #[test]

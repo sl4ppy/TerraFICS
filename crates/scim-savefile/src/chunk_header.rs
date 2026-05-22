@@ -31,7 +31,9 @@ pub struct ChunkHeader {
 /// Only `save_version >= 41` (49-byte format) is supported.
 pub fn read_chunk_header(r: &mut Reader<'_>, save_version: i32) -> Result<ChunkHeader> {
     if save_version < 41 {
-        return Err(Error::UnsupportedSaveVersion { found: save_version });
+        return Err(Error::UnsupportedSaveVersion {
+            found: save_version,
+        });
     }
     let bytes: [u8; CHUNK_HEADER_LEN_V41] = r.read_array()?;
 
@@ -77,12 +79,7 @@ mod tests {
 
     #[test]
     fn read_chunk_header_v41_parses_all_fields() {
-        let bytes = synth_chunk_header_v41(
-            0x9E2A_83C1_u64,
-            0x20000,
-            12_345,
-            131_072,
-        );
+        let bytes = synth_chunk_header_v41(0x9E2A_83C1_u64, 0x20000, 12_345, 131_072);
         let mut r = Reader::new(&bytes);
         let h = read_chunk_header(&mut r, 46).unwrap();
         assert_eq!(h.package_file_tag, 0x9E2A_83C1_u64);
@@ -108,6 +105,13 @@ mod tests {
         let bytes = vec![0_u8; 20]; // way too short
         let mut r = Reader::new(&bytes);
         let err = read_chunk_header(&mut r, 46).unwrap_err();
-        assert!(matches!(err, Error::UnexpectedEof { wanted: 49, available: 20, at: 0 }));
+        assert!(matches!(
+            err,
+            Error::UnexpectedEof {
+                wanted: 49,
+                available: 20,
+                at: 0
+            }
+        ));
     }
 }
