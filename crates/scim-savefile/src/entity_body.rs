@@ -76,7 +76,8 @@ pub fn parse_entity_body<'a>(
         });
     }
 
-    let bag = read_properties(&mut r, save_version, ue5_version, map_name)?;
+    let parent_type = Some(raw_actor.header.class_name.as_str());
+    let bag = read_properties(&mut r, save_version, ue5_version, map_name, parent_type)?;
 
     let trailing_bytes = &body[r.position()..];
 

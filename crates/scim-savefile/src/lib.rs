@@ -46,3 +46,9 @@ pub use property::{
 };
 pub mod entity_body;
 pub use entity_body::{parse_entity_body, EntityBody};
+pub mod property_struct;
+pub mod property_array;
+pub mod property_map;
+pub mod property_set;
+pub mod property_text;
+pub mod property_enum_byte;

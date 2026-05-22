@@ -31,6 +31,7 @@ pub struct Property {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum PropertyValue {
+    // Primitives (P1.3-a)
     Bool(bool),
     Int8(i8),
     Int(i32),
@@ -47,6 +48,18 @@ pub enum PropertyValue {
         path_name: String,
         sub_path_string: String,
     },
+
+    // Composites (P1.3-b — wired in subsequent tasks)
+    Struct(crate::property_struct::StructValue),
+    Array(crate::property_array::ArrayValue),
+    Map(crate::property_map::MapValue),
+    Set(crate::property_set::SetValue),
+    Enum {
+        enum_name: String,
+        value: String,
+    },
+    Byte(crate::property_enum_byte::ByteValue),
+    Text(crate::property_text::TextValue),
 }
 
 /// Read the next property record from `r`. Returns `Ok(None)` if the next name
@@ -57,11 +70,13 @@ pub enum PropertyValue {
 /// - `ue5_version`: the level's UE5 version (controls the `index` field path).
 /// - `map_name`: the save's `map_name`, needed by `read_object_property` for the
 ///   collapsed-form check.
+#[allow(clippy::too_many_lines)] // sequential type-name dispatcher; splitting would obscure flow
 pub fn read_property(
     r: &mut Reader<'_>,
     save_version: i32,
     ue5_version: u32,
     map_name: &str,
+    parent_type: Option<&str>,
 ) -> Result<Option<Property>> {
     if save_version >= 53 {
         return Err(Error::UnsupportedPropertyFormat { save_version });
@@ -79,7 +94,7 @@ pub fn read_property(
         .unwrap_or(type_name_raw.as_str())
         .to_string();
 
-    let _length = r.read_i32()?;
+    let length = r.read_i32()?;
 
     let index = if ue5_version < 1011 {
         Some(r.read_i32()?)
@@ -158,6 +173,62 @@ pub fn read_property(
                 },
             )
         }
+        "Struct" => {
+            let value = crate::property_struct::read_struct_property(
+                r,
+                save_version,
+                ue5_version,
+                map_name,
+                parent_type,
+                length,
+            )?;
+            (None, PropertyValue::Struct(value))
+        }
+        "Array" => {
+            let value = crate::property_array::read_array_property(
+                r,
+                save_version,
+                ue5_version,
+                map_name,
+                parent_type,
+            )?;
+            (None, PropertyValue::Array(value))
+        }
+        "Map" => {
+            let value = crate::property_map::read_map_property(
+                r,
+                save_version,
+                ue5_version,
+                map_name,
+                parent_type,
+            )?;
+            (None, PropertyValue::Map(value))
+        }
+        "Set" => {
+            let value = crate::property_set::read_set_property(
+                r,
+                save_version,
+                ue5_version,
+                map_name,
+                parent_type,
+            )?;
+            (None, PropertyValue::Set(value))
+        }
+        "Enum" => {
+            let (guid, value) =
+                crate::property_enum_byte::read_enum_property(r, save_version, ue5_version)?;
+            (Some(guid), value)
+        }
+        "Byte" => {
+            let (guid, value) =
+                crate::property_enum_byte::read_byte_property(r, save_version, ue5_version)?;
+            (Some(guid), value)
+        }
+        "Text" => {
+            let guid = read_property_guid(r)?;
+            let text = crate::property_text::read_text_property(r)?;
+            (Some(guid), PropertyValue::Text(text))
+        }
         _ => {
             return Err(Error::UnsupportedPropertyType {
                 name,
@@ -200,10 +271,11 @@ pub fn read_properties(
     save_version: i32,
     ue5_version: u32,
     map_name: &str,
+    parent_type: Option<&str>,
 ) -> Result<PropertyBag> {
     let mut bag = PropertyBag::default();
     loop {
-        match read_property(r, save_version, ue5_version, map_name) {
+        match read_property(r, save_version, ue5_version, map_name, parent_type) {
             Ok(Some(p)) => bag.properties.push(p),
             Ok(None) => return Ok(bag),
             Err(Error::UnsupportedPropertyType {
@@ -240,7 +312,7 @@ mod tests {
         let mut bytes = Vec::new();
         write_ascii(&mut bytes, "None");
         let mut r = Reader::new(&bytes);
-        let result = read_property(&mut r, 46, 1000, "MapName").unwrap();
+        let result = read_property(&mut r, 46, 1000, "MapName", None).unwrap();
         assert!(result.is_none());
     }
 
@@ -249,7 +321,7 @@ mod tests {
         let mut bytes = Vec::new();
         write_ascii(&mut bytes, "AnyName");
         let mut r = Reader::new(&bytes);
-        let err = read_property(&mut r, 53, 1000, "MapName").unwrap_err();
+        let err = read_property(&mut r, 53, 1000, "MapName", None).unwrap_err();
         assert!(matches!(
             err,
             Error::UnsupportedPropertyFormat { save_version: 53 }
@@ -276,7 +348,7 @@ mod tests {
         write_no_guid(&mut bytes);
         bytes.extend_from_slice(&42_i32.to_le_bytes());
         let mut r = Reader::new(&bytes);
-        let p = read_property(&mut r, 46, 1000, "MapName").unwrap().unwrap();
+        let p = read_property(&mut r, 46, 1000, "MapName", None).unwrap().unwrap();
         assert_eq!(p.name, "mCount");
         assert_eq!(p.type_name, "Int");
         assert_eq!(p.index, Some(0));
@@ -290,7 +362,7 @@ mod tests {
         write_no_guid(&mut bytes);
         bytes.extend_from_slice(&3.5_f32.to_le_bytes());
         let mut r = Reader::new(&bytes);
-        let p = read_property(&mut r, 46, 1000, "MapName").unwrap().unwrap();
+        let p = read_property(&mut r, 46, 1000, "MapName", None).unwrap().unwrap();
         assert_eq!(p.type_name, "Float");
         match p.value {
             PropertyValue::Float(v) => assert!((v - 3.5).abs() < f32::EPSILON),
@@ -305,7 +377,7 @@ mod tests {
         write_no_guid(&mut bytes);
         bytes.extend_from_slice(&100.25_f64.to_le_bytes());
         let mut r = Reader::new(&bytes);
-        let p = read_property(&mut r, 46, 1000, "MapName").unwrap().unwrap();
+        let p = read_property(&mut r, 46, 1000, "MapName", None).unwrap().unwrap();
         assert_eq!(p.type_name, "Double");
         match p.value {
             PropertyValue::Double(v) => assert!((v - 100.25).abs() < f64::EPSILON),
@@ -320,7 +392,7 @@ mod tests {
         write_no_guid(&mut bytes);
         bytes.extend_from_slice(&(-7_i64).to_le_bytes());
         let mut r = Reader::new(&bytes);
-        let p = read_property(&mut r, 46, 1000, "MapName").unwrap().unwrap();
+        let p = read_property(&mut r, 46, 1000, "MapName", None).unwrap().unwrap();
         assert_eq!(p.type_name, "Int64");
         assert_eq!(p.value, PropertyValue::Int64(-7));
     }
@@ -332,7 +404,7 @@ mod tests {
         write_no_guid(&mut bytes);
         write_ascii(&mut bytes, "hello");
         let mut r = Reader::new(&bytes);
-        let p = read_property(&mut r, 46, 1000, "MapName").unwrap().unwrap();
+        let p = read_property(&mut r, 46, 1000, "MapName", None).unwrap().unwrap();
         assert_eq!(p.type_name, "Str");
         assert_eq!(p.value, PropertyValue::Str("hello".to_string()));
     }
@@ -344,7 +416,7 @@ mod tests {
         bytes.push(1); // value
         write_no_guid(&mut bytes);
         let mut r = Reader::new(&bytes);
-        let p = read_property(&mut r, 46, 1000, "MapName").unwrap().unwrap();
+        let p = read_property(&mut r, 46, 1000, "MapName", None).unwrap().unwrap();
         assert_eq!(p.value, PropertyValue::Bool(true));
     }
 
@@ -355,7 +427,7 @@ mod tests {
         bytes.push(0); // value
         write_no_guid(&mut bytes);
         let mut r = Reader::new(&bytes);
-        let p = read_property(&mut r, 46, 1000, "MapName").unwrap().unwrap();
+        let p = read_property(&mut r, 46, 1000, "MapName", None).unwrap().unwrap();
         assert_eq!(p.value, PropertyValue::Bool(false));
     }
 
@@ -368,7 +440,7 @@ mod tests {
         write_ascii(&mut bytes, "Persistent_Level");
         write_ascii(&mut bytes, "Persistent.Owner_42");
         let mut r = Reader::new(&bytes);
-        let p = read_property(&mut r, 46, 1000, "MapName").unwrap().unwrap();
+        let p = read_property(&mut r, 46, 1000, "MapName", None).unwrap().unwrap();
         assert_eq!(p.type_name, "Object");
         match p.value {
             PropertyValue::ObjectRef(obj) => {
@@ -388,7 +460,7 @@ mod tests {
         write_ascii(&mut bytes, "SubPath");
         bytes.extend_from_slice(&0_i32.to_le_bytes()); // trailer
         let mut r = Reader::new(&bytes);
-        let p = read_property(&mut r, 46, 1000, "MapName").unwrap().unwrap();
+        let p = read_property(&mut r, 46, 1000, "MapName", None).unwrap().unwrap();
         assert_eq!(p.type_name, "SoftObject");
         match p.value {
             PropertyValue::SoftObjectRef {
@@ -417,7 +489,7 @@ mod tests {
         write_ascii(&mut bytes, "None");
 
         let mut r = Reader::new(&bytes);
-        let bag = read_properties(&mut r, 46, 1000, "MapName").unwrap();
+        let bag = read_properties(&mut r, 46, 1000, "MapName", None).unwrap();
         assert_eq!(bag.properties.len(), 2);
         assert_eq!(bag.properties[0].name, "mA");
         assert_eq!(bag.properties[1].name, "mB");
@@ -431,29 +503,29 @@ mod tests {
         write_header(&mut bytes, "mA", "IntProperty", 4, 0);
         write_no_guid(&mut bytes);
         bytes.extend_from_slice(&1_i32.to_le_bytes());
-        // Property 2: Array (unsupported in P1.3-a)
-        write_header(&mut bytes, "mList", "ArrayProperty", 0, 0);
+        // Property 2: an unknown type that remains unsupported after P1.3-b
+        write_header(&mut bytes, "mList", "WeirdModProperty", 0, 0);
 
         let mut r = Reader::new(&bytes);
-        let bag = read_properties(&mut r, 46, 1000, "MapName").unwrap();
+        let bag = read_properties(&mut r, 46, 1000, "MapName", None).unwrap();
         assert_eq!(bag.properties.len(), 1);
         let hit = bag.first_unsupported.expect("expected unsupported hit");
         assert_eq!(hit.property_name, "mList");
-        assert_eq!(hit.type_name, "Array");
+        assert_eq!(hit.type_name, "WeirdMod");
     }
 
     #[test]
     fn unsupported_type_returns_error() {
         let mut bytes = Vec::new();
-        write_header(&mut bytes, "mInventory", "ArrayProperty", 0, 0);
+        write_header(&mut bytes, "mWeird", "WeirdModProperty", 0, 0);
         let mut r = Reader::new(&bytes);
-        let err = read_property(&mut r, 46, 1000, "MapName").unwrap_err();
+        let err = read_property(&mut r, 46, 1000, "MapName", None).unwrap_err();
         match err {
             Error::UnsupportedPropertyType {
                 name, type_name, ..
             } => {
-                assert_eq!(name, "mInventory");
-                assert_eq!(type_name, "Array");
+                assert_eq!(name, "mWeird");
+                assert_eq!(type_name, "WeirdMod");
             }
             other => panic!("expected UnsupportedPropertyType, got {other:?}"),
         }
