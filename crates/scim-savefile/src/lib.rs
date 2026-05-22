@@ -30,3 +30,5 @@ pub use object_header::{
     read_object_header, read_objects_in_level, ObjectHeaderBody, ObjectKind, RawObjectHeader,
     Transform,
 };
+pub mod entity;
+pub use entity::{read_entities_in_level, read_entity, RawEntity};

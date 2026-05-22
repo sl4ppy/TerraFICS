@@ -76,6 +76,14 @@ impl<'a> Reader<'a> {
         Ok(bytes.try_into().expect("take returned exactly N bytes"))
     }
 
+    /// Return the underlying byte slice starting at `pos` (clamped to buffer end).
+    /// Does NOT advance the cursor — purely a borrow.
+    #[must_use]
+    pub fn as_slice_from(&self, pos: usize) -> &'a [u8] {
+        let p = pos.min(self.bytes.len());
+        &self.bytes[p..]
+    }
+
     /// Set the cursor to `pos` (clamped to the buffer length).
     ///
     /// Subsequent reads will continue from that position. Callers are responsible
@@ -372,6 +380,12 @@ mod tests {
         let v = r.read_f32().unwrap();
         assert!((v - 1.0_f32).abs() < f32::EPSILON);
         assert_eq!(r.position(), 4);
+    }
+
+    #[test]
+    fn as_slice_from_returns_suffix() {
+        let r = Reader::new(&[1, 2, 3, 4, 5]);
+        assert_eq!(r.as_slice_from(2), &[3, 4, 5]);
     }
 
     #[test]
