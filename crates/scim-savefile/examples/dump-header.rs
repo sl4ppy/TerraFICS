@@ -7,6 +7,7 @@ use std::fmt::Write as _;
 use std::path::PathBuf;
 use std::process::ExitCode;
 
+#[allow(clippy::too_many_lines)] // sequential diagnostic pipeline; splitting would obscure flow
 fn main() -> ExitCode {
     let Some(path) = std::env::args().nth(1) else {
         eprintln!("usage: dump-header <path-to-sav>");
@@ -87,12 +88,30 @@ fn main() -> ExitCode {
                 Ok(env) => {
                     println!("levels:              {}", env.levels.len());
                     let mut total = 0_usize;
+                    let mut prop_total = 0_usize;
+                    let mut fully = 0_usize;
                     for r in scim_savefile::stream_actors(&env, &h) {
-                        if r.is_ok() {
-                            total += 1;
+                        let Ok(actor) = r else { continue };
+                        total += 1;
+                        if h.save_version < 53 {
+                            let lvl_sv = env
+                                .levels
+                                .iter()
+                                .find(|l| l.name == actor.level_name)
+                                .map_or(h.save_version, |l| l.save_version);
+                            if let Ok(eb) = scim_savefile::parse_entity_body(
+                                &actor, lvl_sv, 1000, &h.map_name,
+                            ) {
+                                prop_total += eb.properties.len();
+                                if eb.first_unsupported.is_none() {
+                                    fully += 1;
+                                }
+                            }
                         }
                     }
                     println!("actors:              {total}");
+                    println!("properties:          {prop_total}");
+                    println!("fully_parsed_actors: {fully}");
                 }
                 Err(e) => eprintln!("warning: envelope: {e}"),
             }
