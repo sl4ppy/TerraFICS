@@ -9,10 +9,12 @@
 //!
 //! Cross-reference: SC-InteractiveMap/src/SaveParser/Read.js:2476-2490.
 
+use serde::{Deserialize, Serialize};
+
 use crate::error::Result;
 use crate::reader::Reader;
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ObjectProperty {
     /// `None` when the first string equaled `map_name` (collapsed form).
     pub level_name: Option<String>,

@@ -25,3 +25,7 @@ pub use body_envelope::{
 };
 pub mod object_property;
 pub use object_property::{read_object_property, ObjectProperty};
+pub mod object_header;
+pub use object_header::{
+    read_object_header, ObjectHeaderBody, ObjectKind, RawObjectHeader, Transform,
+};

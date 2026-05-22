@@ -46,6 +46,9 @@ pub enum Error {
         expected: u64,
         actual: u64,
     },
+
+    #[error("unsupported object_type {found} (only 0=Object and 1=Actor are recognized)")]
+    UnsupportedObjectType { found: i32 },
 }
 
 #[allow(unused_attributes)] // #[must_use] on type alias is not yet enforced by this rustc version but documents intent
