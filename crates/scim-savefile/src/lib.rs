@@ -8,3 +8,5 @@ pub mod error;
 pub use error::{Error, Result};
 pub mod reader;
 pub mod versions;
+pub mod header;
+pub use header::{Header, read_header};
