@@ -169,12 +169,15 @@ mod tests {
     fn synth_actor_v52() -> Vec<u8> {
         let mut b = Vec::new();
         b.extend_from_slice(&1_i32.to_le_bytes()); // type = 1 (Actor)
-        write_ascii(&mut b, "/Game/FactoryGame/Build_Assembler.Build_Assembler_C");
+        write_ascii(
+            &mut b,
+            "/Game/FactoryGame/Build_Assembler.Build_Assembler_C",
+        );
         write_ascii(&mut b, "Persistent_Level");
         write_ascii(&mut b, "Persistent.Build_Assembler_C_42");
         b.extend_from_slice(&0x1234_5678_u32.to_le_bytes()); // object_flags
         b.extend_from_slice(&1_i32.to_le_bytes()); // need_transform
-        // rotation
+                                                   // rotation
         b.extend_from_slice(&0.0_f32.to_le_bytes());
         b.extend_from_slice(&0.0_f32.to_le_bytes());
         b.extend_from_slice(&0.0_f32.to_le_bytes());
@@ -202,9 +205,21 @@ mod tests {
         match h.body {
             ObjectHeaderBody::Actor { transform } => {
                 assert_eq!(transform.need_transform, 1);
-                assert!(transform.rotation.iter().zip([0.0, 0.0, 0.0, 1.0]).all(|(a, b)| (a - b).abs() < f32::EPSILON));
-                assert!(transform.translation.iter().zip([100.0, 200.0, 50.0]).all(|(a, b)| (a - b).abs() < f32::EPSILON));
-                assert!(transform.scale3d.iter().zip([1.0, 1.0, 1.0]).all(|(a, b)| (a - b).abs() < f32::EPSILON));
+                assert!(transform
+                    .rotation
+                    .iter()
+                    .zip([0.0, 0.0, 0.0, 1.0])
+                    .all(|(a, b)| (a - b).abs() < f32::EPSILON));
+                assert!(transform
+                    .translation
+                    .iter()
+                    .zip([100.0, 200.0, 50.0])
+                    .all(|(a, b)| (a - b).abs() < f32::EPSILON));
+                assert!(transform
+                    .scale3d
+                    .iter()
+                    .zip([1.0, 1.0, 1.0])
+                    .all(|(a, b)| (a - b).abs() < f32::EPSILON));
                 assert_eq!(transform.was_placed_in_level, 0);
             }
             ObjectHeaderBody::Object { .. } => panic!("expected Actor body"),

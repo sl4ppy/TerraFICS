@@ -34,13 +34,14 @@ pub fn read_entity<'a>(r: &mut Reader<'a>) -> Result<RawEntity<'a>> {
         })?;
 
     let body_start = r.position();
-    let body_end = body_start.checked_add(entity_length_usize).ok_or_else(|| {
-        Error::UnexpectedEof {
-            wanted: entity_length_usize,
-            available: r.remaining(),
-            at: body_start,
-        }
-    })?;
+    let body_end =
+        body_start
+            .checked_add(entity_length_usize)
+            .ok_or_else(|| Error::UnexpectedEof {
+                wanted: entity_length_usize,
+                available: r.remaining(),
+                at: body_start,
+            })?;
     if body_end > r.position() + r.remaining() {
         return Err(Error::UnexpectedEof {
             wanted: body_end - r.position(),
