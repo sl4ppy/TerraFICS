@@ -6,3 +6,4 @@
 // modules added in later tasks
 pub mod error;
 pub use error::{Error, Result};
+pub mod reader;
