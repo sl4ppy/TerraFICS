@@ -43,6 +43,10 @@ impl<'a> Reader<'a> {
         Ok(self.take(1)?[0])
     }
 
+    pub fn read_i8(&mut self) -> Result<i8> {
+        Ok(i8::from_le_bytes([self.take(1)?[0]]))
+    }
+
     pub fn read_i32(&mut self) -> Result<i32> {
         let b = self.take(4)?;
         Ok(i32::from_le_bytes([b[0], b[1], b[2], b[3]]))
@@ -56,6 +60,20 @@ impl<'a> Reader<'a> {
     pub fn read_f32(&mut self) -> Result<f32> {
         let b = self.take(4)?;
         Ok(f32::from_le_bytes([b[0], b[1], b[2], b[3]]))
+    }
+
+    pub fn read_u64(&mut self) -> Result<u64> {
+        let b = self.take(8)?;
+        Ok(u64::from_le_bytes([
+            b[0], b[1], b[2], b[3], b[4], b[5], b[6], b[7],
+        ]))
+    }
+
+    pub fn read_f64(&mut self) -> Result<f64> {
+        let b = self.take(8)?;
+        Ok(f64::from_le_bytes([
+            b[0], b[1], b[2], b[3], b[4], b[5], b[6], b[7],
+        ]))
     }
 
     pub fn read_i64(&mut self) -> Result<i64> {
@@ -397,6 +415,71 @@ mod tests {
             Error::UnexpectedEof {
                 wanted: 4,
                 available: 2,
+                at: 0
+            }
+        ));
+    }
+
+    #[test]
+    fn read_i8_advances_one_byte_signed() {
+        let mut r = Reader::new(&[0xFF_u8, 0x7F]);
+        assert_eq!(r.read_i8().unwrap(), -1_i8);
+        assert_eq!(r.read_i8().unwrap(), 127_i8);
+    }
+
+    #[test]
+    fn read_i8_at_eof_errors() {
+        let mut r = Reader::new(&[]);
+        let err = r.read_i8().unwrap_err();
+        assert!(matches!(
+            err,
+            Error::UnexpectedEof {
+                wanted: 1,
+                available: 0,
+                at: 0
+            }
+        ));
+    }
+
+    #[test]
+    fn read_u64_is_little_endian() {
+        let mut r = Reader::new(&[0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08]);
+        assert_eq!(r.read_u64().unwrap(), 0x0807_0605_0403_0201_u64);
+        assert_eq!(r.position(), 8);
+    }
+
+    #[test]
+    fn read_u64_at_eof_errors() {
+        let mut r = Reader::new(&[0x01, 0x02, 0x03]);
+        let err = r.read_u64().unwrap_err();
+        assert!(matches!(
+            err,
+            Error::UnexpectedEof {
+                wanted: 8,
+                available: 3,
+                at: 0
+            }
+        ));
+    }
+
+    #[test]
+    fn read_f64_is_little_endian() {
+        // 1.0_f64 = 0x3FF0000000000000
+        let mut r = Reader::new(&[0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xF0, 0x3F]);
+        let v = r.read_f64().unwrap();
+        assert!((v - 1.0_f64).abs() < f64::EPSILON);
+        assert_eq!(r.position(), 8);
+    }
+
+    #[test]
+    fn read_f64_at_eof_errors() {
+        let mut r = Reader::new(&[0x00; 5]);
+        let err = r.read_f64().unwrap_err();
+        assert!(matches!(
+            err,
+            Error::UnexpectedEof {
+                wanted: 8,
+                available: 5,
                 at: 0
             }
         ));
