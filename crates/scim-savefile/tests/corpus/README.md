@@ -4,7 +4,7 @@ Pinned `.sav` files used by `scim-savefile` integration tests.
 
 | File | Provenance | save_header_type | Notes |
 |------|------------|------------------|-------|
-| `CREATIVE TEST.sav` | Copied from AnthorNet/SC-InteractiveMap repo at commit 8f2277e | TBD (read on first test run; document here) | Small ~1.6 MB sanity check. |
+| `CREATIVE TEST.sav` | Copied from AnthorNet/SC-InteractiveMap repo at commit 8f2277e | 13 | save_version=46, build_version=367502. ~1.35 MB sanity check. |
 
 ## Adding fixtures
 
