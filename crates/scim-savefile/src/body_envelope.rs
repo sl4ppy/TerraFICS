@@ -56,6 +56,36 @@ pub struct PartitionLevel {
     pub level_hex: u32,
 }
 
+fn read_partitions(r: &mut Reader<'_>) -> Result<Partitions> {
+    let partition_count = r.read_i32()?;
+    r.read_string()?; // skip None marker
+    r.read_u32()?;    // skip zero uint
+    let head_hex_1 = r.read_u32()?;
+    r.read_i32()?;    // skip one int
+    r.read_string()?; // skip None marker
+    let head_hex_2 = r.read_u32()?;
+
+    let mut data = Vec::new();
+    // The JS source iterates `i = 1; i < partition_count`, i.e. partition_count - 1 entries.
+    for _ in 1..partition_count {
+        let name = r.read_string()?;
+        let grid_hex = r.read_u32()?;
+        let count = r.read_u32()?;
+        let nb_levels = r.read_i32()?;
+
+        let mut levels = Vec::with_capacity(usize::try_from(nb_levels.max(0)).unwrap_or(0));
+        for _ in 0..nb_levels {
+            let level_name = r.read_string()?;
+            let level_hex = r.read_u32()?;
+            levels.push(PartitionLevel { name: level_name, level_hex });
+        }
+
+        data.push(PartitionData { name, grid_hex, count, levels });
+    }
+
+    Ok(Partitions { head_hex_1, head_hex_2, data })
+}
+
 /// Parse the outer structure of a decompressed save body.
 /// `body_bytes` is the buffer returned by `read_body`.
 pub fn read_body_envelope<'a>(body_bytes: &'a [u8], header: &Header) -> Result<BodyEnvelope<'a>> {
@@ -72,9 +102,15 @@ pub fn read_body_envelope<'a>(body_bytes: &'a [u8], header: &Header) -> Result<B
     // Skip the leading total-inflated-length prefix (u64 for >= 41).
     let _total_inflated_length = r.read_i64()?;
 
-    // Partitions + levels come in subsequent tasks.
+    let partitions = if header.save_version >= 41 && header.is_partitioned_world == Some(1) {
+        Some(read_partitions(&mut r)?)
+    } else {
+        None
+    };
+
+    // Levels come in the next task.
     Ok(BodyEnvelope {
-        partitions: None,
+        partitions,
         levels: Vec::new(),
         body_bytes,
     })
@@ -138,5 +174,66 @@ mod tests {
         let env = read_body_envelope(&body, &header).unwrap();
         assert!(env.partitions.is_none());
         assert!(env.levels.is_empty());
+    }
+
+    #[test]
+    fn no_partitions_when_header_says_not_partitioned() {
+        let mut body = Vec::new();
+        body.extend_from_slice(&0_u64.to_le_bytes()); // length prefix
+        body.extend_from_slice(&0_i32.to_le_bytes()); // nb_levels (parsed in next task)
+        let header = synth_header(46, /* is_partitioned */ false, "Persistent_Level");
+        let env = read_body_envelope(&body, &header).unwrap();
+        assert!(env.partitions.is_none());
+    }
+
+    /// Build a minimal valid partitions block with 1 partition entry (`partition_count` = 2,
+    /// so the loop runs once for `i = 1`).
+    fn synth_partitions_block() -> Vec<u8> {
+        let mut b = Vec::new();
+        // partition_count = 2
+        b.extend_from_slice(&2_i32.to_le_bytes());
+        write_ascii(&mut b, "None");                  // skipped string
+        b.extend_from_slice(&0_u32.to_le_bytes());    // skipped uint = 0
+        b.extend_from_slice(&0xCAFE_BABE_u32.to_le_bytes()); // head_hex_1
+        b.extend_from_slice(&1_i32.to_le_bytes());    // skipped int = 1
+        write_ascii(&mut b, "None");                  // skipped string
+        b.extend_from_slice(&0xDEAD_BEEF_u32.to_le_bytes()); // head_hex_2
+
+        // One partition data block (partition_count - 1 = 1 iteration)
+        write_ascii(&mut b, "MainGrid");
+        b.extend_from_slice(&0x1111_2222_u32.to_le_bytes()); // grid_hex
+        b.extend_from_slice(&5_u32.to_le_bytes());           // count
+        b.extend_from_slice(&2_i32.to_le_bytes());           // nb_levels = 2
+
+        // 2 sub-level entries
+        write_ascii(&mut b, "SubLevel1");
+        b.extend_from_slice(&0x3333_4444_u32.to_le_bytes()); // level_hex
+        write_ascii(&mut b, "SubLevel2");
+        b.extend_from_slice(&0x5555_6666_u32.to_le_bytes());
+
+        b
+    }
+
+    #[test]
+    fn parses_partitions_block() {
+        let mut body = Vec::new();
+        body.extend_from_slice(&0_u64.to_le_bytes()); // length prefix
+        body.extend_from_slice(&synth_partitions_block());
+        body.extend_from_slice(&0_i32.to_le_bytes()); // nb_levels = 0 (no levels follow)
+        let header = synth_header(46, /* is_partitioned */ true, "Persistent_Level");
+        let env = read_body_envelope(&body, &header).unwrap();
+        let p = env.partitions.expect("expected partitions");
+        assert_eq!(p.head_hex_1, 0xCAFE_BABE);
+        assert_eq!(p.head_hex_2, 0xDEAD_BEEF);
+        assert_eq!(p.data.len(), 1);
+        let pd = &p.data[0];
+        assert_eq!(pd.name, "MainGrid");
+        assert_eq!(pd.grid_hex, 0x1111_2222);
+        assert_eq!(pd.count, 5);
+        assert_eq!(pd.levels.len(), 2);
+        assert_eq!(pd.levels[0].name, "SubLevel1");
+        assert_eq!(pd.levels[0].level_hex, 0x3333_4444);
+        assert_eq!(pd.levels[1].name, "SubLevel2");
+        assert_eq!(pd.levels[1].level_hex, 0x5555_6666);
     }
 }
