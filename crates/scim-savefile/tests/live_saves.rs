@@ -223,5 +223,47 @@ fn parse_one(path: &Path) -> Result<Outcome, String> {
         }
     }
 
+    // Parse property bags (P1.3-a).
+    if header.save_version < 53 {
+        if let Ok(env) = scim_savefile::read_body_envelope(&body, &header) {
+            let mut tally = 0_usize;
+            let mut fully = 0_usize;
+            let mut stopped = 0_usize;
+            let mut first_unsupp: Option<String> = None;
+            for r in scim_savefile::stream_actors(&env, &header) {
+                let Ok(actor) = r else { continue };
+                let level_save_version = env
+                    .levels
+                    .iter()
+                    .find(|l| l.name == actor.level_name)
+                    .map_or(header.save_version, |l| l.save_version);
+                if let Ok(eb) = scim_savefile::parse_entity_body(
+                    &actor,
+                    level_save_version,
+                    1000,
+                    &header.map_name,
+                ) {
+                    tally += eb.properties.len();
+                    if let Some(hit) = eb.first_unsupported {
+                        stopped += 1;
+                        if first_unsupp.is_none() {
+                            first_unsupp = Some(hit.type_name);
+                        }
+                    } else {
+                        fully += 1;
+                    }
+                }
+            }
+            eprintln!(
+                "      properties: {tally} decoded ({fully} actors fully parsed, {stopped} stopped on composite, first composite: {first_unsupp:?})"
+            );
+        }
+    } else {
+        eprintln!(
+            "      properties: skipped (save_version {} >= 53)",
+            header.save_version
+        );
+    }
+
     Ok(Outcome::Parsed)
 }
