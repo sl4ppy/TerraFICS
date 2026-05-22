@@ -37,3 +37,5 @@ pub mod raw_actor;
 pub use raw_actor::{stream_actors, RawActor};
 pub mod property_guid;
 pub use property_guid::{read_property_guid, PropertyGuid};
+pub mod property;
+pub use property::{read_property, Property, PropertyValue};

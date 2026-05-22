@@ -58,6 +58,18 @@ pub enum Error {
         objects: usize,
         entities: usize,
     },
+
+    #[error(
+        "save_version {save_version} property-record parsing is unsupported (P1.3-a only handles save_version < 53)"
+    )]
+    UnsupportedPropertyFormat { save_version: i32 },
+
+    #[error("unsupported property type {type_name:?} for property {name:?} at offset {at}")]
+    UnsupportedPropertyType {
+        name: String,
+        type_name: String,
+        at: usize,
+    },
 }
 
 #[allow(unused_attributes)] // #[must_use] on type alias is not yet enforced by this rustc version but documents intent
