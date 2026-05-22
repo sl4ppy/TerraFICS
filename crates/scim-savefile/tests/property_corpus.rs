@@ -4,9 +4,7 @@
 use std::collections::HashMap;
 use std::path::PathBuf;
 
-use scim_savefile::{
-    parse_entity_body, read_body, read_body_envelope, read_header, stream_actors,
-};
+use scim_savefile::{parse_entity_body, read_body, read_body_envelope, read_header, stream_actors};
 
 fn corpus_path(name: &str) -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))

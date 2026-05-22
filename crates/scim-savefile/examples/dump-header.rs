@@ -99,9 +99,9 @@ fn main() -> ExitCode {
                                 .iter()
                                 .find(|l| l.name == actor.level_name)
                                 .map_or(h.save_version, |l| l.save_version);
-                            if let Ok(eb) = scim_savefile::parse_entity_body(
-                                &actor, lvl_sv, 1000, &h.map_name,
-                            ) {
+                            if let Ok(eb) =
+                                scim_savefile::parse_entity_body(&actor, lvl_sv, 1000, &h.map_name)
+                            {
                                 prop_total += eb.properties.len();
                                 if eb.first_unsupported.is_none() {
                                     fully += 1;
