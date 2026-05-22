@@ -8,7 +8,7 @@ use crate::reader::Reader;
 use crate::versions::{
     HAS_EDITOR_OBJECT_VERSION_FROM, HAS_MOD_METADATA_FROM,
     HAS_PARTITIONED_WORLD_FROM, HAS_SAVE_IDENTIFIER_FROM,
-    HAS_SAVE_NAME_FROM, MAX_KNOWN_HEADER_TYPE,
+    HAS_SAVE_NAME_FROM, MAX_KNOWN_HEADER_TYPE, MIN_SUPPORTED_HEADER_TYPE,
 };
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -38,7 +38,7 @@ pub fn read_header(bytes: &[u8]) -> Result<(Header, usize)> {
     let mut r = Reader::new(bytes);
 
     let save_header_type = r.read_i32()?;
-    if !(0..=MAX_KNOWN_HEADER_TYPE).contains(&save_header_type) {
+    if !(MIN_SUPPORTED_HEADER_TYPE..=MAX_KNOWN_HEADER_TYPE).contains(&save_header_type) {
         return Err(Error::UnsupportedHeaderType { found: save_header_type });
     }
 
@@ -201,5 +201,57 @@ mod tests {
         let bytes = (-1_i32).to_le_bytes();
         let err = read_header(&bytes).unwrap_err();
         assert!(matches!(err, Error::UnsupportedHeaderType { found: -1 }));
+    }
+
+    fn synth_header_type_14() -> Vec<u8> {
+        let mut b = Vec::new();
+        b.extend_from_slice(&14_i32.to_le_bytes());
+        b.extend_from_slice(&41_i32.to_le_bytes());
+        b.extend_from_slice(&368_883_i32.to_le_bytes());
+        // save_name appears for the first time at header_type >= 14
+        write_ascii(&mut b, "MySave");
+        write_ascii(&mut b, "Persistent_Level");
+        write_ascii(&mut b, "?listen");
+        write_ascii(&mut b, "Session Name");
+        b.extend_from_slice(&500_i32.to_le_bytes());
+        b.extend_from_slice(&637_000_000_000_000_000_i64.to_le_bytes());
+        b.push(1);
+        b.extend_from_slice(&50_i32.to_le_bytes());
+        write_ascii(&mut b, "");
+        b.extend_from_slice(&0_i32.to_le_bytes());
+        write_ascii(&mut b, "SAVEID");
+        b.extend_from_slice(&0_i32.to_le_bytes());
+        b.extend_from_slice(&[0xBB; 20]);
+        b.extend_from_slice(&0_i32.to_le_bytes());
+        b
+    }
+
+    #[test]
+    fn read_header_type_14_includes_save_name() {
+        let bytes = synth_header_type_14();
+        let (h, consumed) = read_header(&bytes).unwrap();
+        assert_eq!(h.save_header_type, 14);
+        assert_eq!(h.save_name.as_deref(), Some("MySave"),
+            "save_name appears only at header_type >= 14");
+        assert_eq!(h.map_name, "Persistent_Level");
+        assert_eq!(h.session_name, "Session Name");
+        assert_eq!(consumed, bytes.len());
+    }
+
+    #[test]
+    fn read_header_rejects_type_just_above_max() {
+        // 15 is just past MAX_KNOWN_HEADER_TYPE (14). This is the value users will see
+        // first when a new game patch ships before we update versions.rs.
+        let bytes = 15_i32.to_le_bytes();
+        let err = read_header(&bytes).unwrap_err();
+        assert!(matches!(err, Error::UnsupportedHeaderType { found: 15 }));
+    }
+
+    #[test]
+    fn read_header_rejects_type_below_min() {
+        // 6 is just below MIN_SUPPORTED_HEADER_TYPE (7). Pre-Update-3 era; not supported.
+        let bytes = 6_i32.to_le_bytes();
+        let err = read_header(&bytes).unwrap_err();
+        assert!(matches!(err, Error::UnsupportedHeaderType { found: 6 }));
     }
 }

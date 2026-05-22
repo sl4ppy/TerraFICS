@@ -12,7 +12,9 @@ pub enum Error {
         at: usize,
     },
 
-    #[error("unsupported save_header_type {found} (only 0..=99 are recognized)")]
+    // NOTE: the bounds in this error message are duplicated from versions.rs
+    // (MIN_SUPPORTED_HEADER_TYPE..=MAX_KNOWN_HEADER_TYPE). Keep in sync.
+    #[error("unsupported save_header_type {found} (only 7..=14 are recognized by this build)")]
     UnsupportedHeaderType { found: i32 },
 
     #[error("invalid UTF-8 in string at offset {at}: {source}")]
