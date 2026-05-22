@@ -7,8 +7,9 @@ authors.workspace      = true
 license.workspace      = true
 
 [dependencies]
-thiserror.workspace = true
-serde     = { workspace = true, features = ["derive"] }
+thiserror.workspace   = true
+serde                 = { workspace = true, features = ["derive"] }
+miniz_oxide.workspace = true
 
 [lints]
 workspace = true
