@@ -76,6 +76,17 @@ impl<'a> Reader<'a> {
         ]))
     }
 
+    /// UE GUID: 16 bytes, with the "all-zero → None" convention used by `readGUID`
+    /// in the JS source (Read.js:2502-2528).
+    pub fn read_guid(&mut self) -> Result<Option<[u8; 16]>> {
+        let arr = self.read_array::<16>()?;
+        if arr.iter().all(|b| *b == 0) {
+            Ok(None)
+        } else {
+            Ok(Some(arr))
+        }
+    }
+
     pub fn read_i64(&mut self) -> Result<i64> {
         let b = self.take(8)?;
         let mut buf = [0u8; 8];
@@ -469,6 +480,28 @@ mod tests {
         let v = r.read_f64().unwrap();
         assert!((v - 1.0_f64).abs() < f64::EPSILON);
         assert_eq!(r.position(), 8);
+    }
+
+    #[test]
+    fn read_guid_all_zero_returns_none() {
+        let mut r = Reader::new(&[0_u8; 16]);
+        assert_eq!(r.read_guid().unwrap(), None);
+        assert_eq!(r.position(), 16);
+    }
+
+    #[test]
+    fn read_guid_non_zero_returns_some() {
+        let mut bytes = [0_u8; 16];
+        bytes[5] = 0xAB;
+        let mut r = Reader::new(&bytes);
+        assert_eq!(r.read_guid().unwrap(), Some(bytes));
+    }
+
+    #[test]
+    fn read_guid_eof_errors() {
+        let mut r = Reader::new(&[0_u8; 8]);
+        let err = r.read_guid().unwrap_err();
+        assert!(matches!(err, Error::UnexpectedEof { wanted: 16, .. }));
     }
 
     #[test]
