@@ -49,6 +49,15 @@ pub enum Error {
 
     #[error("unsupported object_type {found} (only 0=Object and 1=Actor are recognized)")]
     UnsupportedObjectType { found: i32 },
+
+    #[error(
+        "object/entity count mismatch in level {level:?}: {objects} object headers, {entities} entities"
+    )]
+    ObjectEntityCountMismatch {
+        level: String,
+        objects: usize,
+        entities: usize,
+    },
 }
 
 #[allow(unused_attributes)] // #[must_use] on type alias is not yet enforced by this rustc version but documents intent

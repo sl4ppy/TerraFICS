@@ -32,3 +32,5 @@ pub use object_header::{
 };
 pub mod entity;
 pub use entity::{read_entities_in_level, read_entity, RawEntity};
+pub mod raw_actor;
+pub use raw_actor::{stream_actors, RawActor};
