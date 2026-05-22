@@ -3,7 +3,7 @@
 
 use thiserror::Error;
 
-#[derive(Debug, Clone, Error)]
+#[derive(Debug, Error)]
 pub enum Error {
     #[error("unexpected EOF: wanted {wanted} bytes, only {available} available at offset {at}")]
     UnexpectedEof {
@@ -26,6 +26,13 @@ pub enum Error {
 
     #[error("invalid UTF-16 in string at offset {at}")]
     InvalidUtf16 { at: usize },
+
+    #[error("zlib decompression failed at offset {at}: {source}")]
+    ZlibInflate {
+        at: usize,
+        #[source]
+        source: miniz_oxide::inflate::DecompressError,
+    },
 }
 
 #[allow(unused_attributes)] // #[must_use] on type alias is not yet enforced by this rustc version but documents intent
@@ -56,5 +63,17 @@ mod tests {
             e.to_string().contains("123"),
             "should include the bad value"
         );
+    }
+
+    #[test]
+    fn zlib_inflate_message_includes_offset_and_source() {
+        // Construct a deliberately-broken zlib stream and use the real DecompressError type.
+        // The zlib header byte 0x00 is invalid, so this will reliably fail.
+        let bad: &[u8] = &[0x00];
+        let underlying = miniz_oxide::inflate::decompress_to_vec_zlib(bad).unwrap_err();
+        let e = Error::ZlibInflate { at: 12345, source: underlying };
+        let s = e.to_string();
+        assert!(s.contains("12345"), "should mention offset: {s}");
+        assert!(s.contains("zlib"), "should mention 'zlib': {s}");
     }
 }
