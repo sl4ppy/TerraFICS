@@ -20,11 +20,13 @@ impl<'a> Reader<'a> {
     #[must_use]
     pub const fn remaining(&self) -> usize { self.bytes.len().saturating_sub(self.pos) }
 
+    #[inline]
     fn take(&mut self, n: usize) -> Result<&'a [u8]> {
-        if self.pos + n > self.bytes.len() {
+        let available = self.bytes.len() - self.pos;
+        if n > available {
             return Err(Error::UnexpectedEof {
                 wanted: n,
-                available: self.bytes.len() - self.pos,
+                available,
                 at: self.pos,
             });
         }
@@ -72,6 +74,15 @@ impl<'a> Reader<'a> {
             }
             std::cmp::Ordering::Less => {
                 let n = len.unsigned_abs() as usize;
+                // Defend against length prefixes that would overflow usize when doubled,
+                // and skip the take() in the obvious-EOF case to give a precise error.
+                if n > self.remaining() / 2 {
+                    return Err(Error::UnexpectedEof {
+                        wanted: n.saturating_mul(2),
+                        available: self.remaining(),
+                        at: self.pos,
+                    });
+                }
                 let byte_len = n * 2;
                 let at = self.pos;
                 let bytes = self.take(byte_len)?;
@@ -175,5 +186,53 @@ mod tests {
         bytes.push(0);
         let mut r = Reader::new(&bytes);
         assert_eq!(r.read_string().unwrap(), "hi");
+    }
+
+    #[test]
+    fn read_i32_at_eof_errors() {
+        let mut r = Reader::new(&[0x00, 0x00, 0x00]);
+        let err = r.read_i32().unwrap_err();
+        assert!(matches!(err, Error::UnexpectedEof { wanted: 4, available: 3, at: 0 }));
+    }
+
+    #[test]
+    fn read_i64_at_eof_errors() {
+        let mut r = Reader::new(&[0x01, 0x02, 0x03]);
+        let err = r.read_i64().unwrap_err();
+        assert!(matches!(err, Error::UnexpectedEof { wanted: 8, available: 3, at: 0 }));
+    }
+
+    #[test]
+    fn read_string_invalid_utf8() {
+        let mut bytes = vec![];
+        bytes.extend_from_slice(&1_i32.to_le_bytes());
+        bytes.push(0xFF); // not a valid UTF-8 start byte
+        let mut r = Reader::new(&bytes);
+        let err = r.read_string().unwrap_err();
+        assert!(matches!(err, Error::InvalidUtf8 { .. }));
+    }
+
+    #[test]
+    fn read_string_utf16_lone_surrogate() {
+        // Length -2 => 2 code units. First code unit is a high surrogate (0xD800) with
+        // nothing valid after it. Total of 4 bytes.
+        let mut bytes = vec![];
+        bytes.extend_from_slice(&(-2_i32).to_le_bytes());
+        bytes.push(0x00); bytes.push(0xD8); // 0xD800 high surrogate (LE bytes)
+        bytes.push(0x00); bytes.push(0x00); // null code unit (stripped before from_utf16)
+        let mut r = Reader::new(&bytes);
+        let err = r.read_string().unwrap_err();
+        assert!(matches!(err, Error::InvalidUtf16 { .. }));
+    }
+
+    #[test]
+    fn read_string_utf16_eof_on_huge_length() {
+        // -1_000_000 chars claimed but no bytes follow. Should error cleanly, not panic
+        // or allocate 2 MB+. This exercises the n > remaining()/2 short-circuit.
+        let mut bytes = vec![];
+        bytes.extend_from_slice(&(-1_000_000_i32).to_le_bytes());
+        let mut r = Reader::new(&bytes);
+        let err = r.read_string().unwrap_err();
+        assert!(matches!(err, Error::UnexpectedEof { .. }));
     }
 }
