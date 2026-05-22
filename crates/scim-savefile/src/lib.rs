@@ -23,3 +23,5 @@ pub mod body_envelope;
 pub use body_envelope::{
     read_body_envelope, BodyEnvelope, LevelInfo, PartitionData, PartitionLevel, Partitions,
 };
+pub mod object_property;
+pub use object_property::{read_object_property, ObjectProperty};
