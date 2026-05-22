@@ -101,6 +101,27 @@ pub fn read_object_header(
     })
 }
 
+/// Walk a level's objects block, parsing every object header.
+///
+/// `bytes` is the slice corresponding to `LevelInfo::objects_byte_range`.
+/// Returns the list of headers. Any trailing bytes (level-persistent flag, collectables-
+/// in-between, etc.) are silently ignored — the envelope already partitions them out.
+pub fn read_objects_in_level(
+    bytes: &[u8],
+    level_save_version: i32,
+    map_name: &str,
+) -> Result<Vec<RawObjectHeader>> {
+    let mut r = Reader::new(bytes);
+    let count = r.read_i32()?;
+    let count_usize = usize::try_from(count.max(0)).unwrap_or(0);
+
+    let mut out = Vec::with_capacity(count_usize);
+    for _ in 0..count_usize {
+        out.push(read_object_header(&mut r, level_save_version, map_name)?);
+    }
+    Ok(out)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -188,6 +209,26 @@ mod tests {
             }
             ObjectHeaderBody::Object { .. } => panic!("expected Actor body"),
         }
+    }
+
+    #[test]
+    fn reads_objects_in_level_with_two_actors() {
+        let mut bytes = Vec::new();
+        bytes.extend_from_slice(&2_i32.to_le_bytes()); // count = 2
+        bytes.extend(synth_actor_v52());
+        bytes.extend(synth_actor_v52());
+        let headers = read_objects_in_level(&bytes, 52, "MapName").unwrap();
+        assert_eq!(headers.len(), 2);
+        for h in &headers {
+            assert_eq!(h.kind, ObjectKind::Actor);
+        }
+    }
+
+    #[test]
+    fn reads_empty_objects_block() {
+        let bytes = 0_i32.to_le_bytes(); // count = 0
+        let headers = read_objects_in_level(&bytes, 46, "MapName").unwrap();
+        assert!(headers.is_empty());
     }
 
     #[test]
