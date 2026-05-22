@@ -71,6 +71,15 @@ impl<'a> Reader<'a> {
         Ok(bytes.try_into().expect("take returned exactly N bytes"))
     }
 
+    /// Set the cursor to `pos` (clamped to the buffer length).
+    ///
+    /// Subsequent reads will continue from that position. Callers are responsible
+    /// for bounds-checking any seek-then-read pattern; reads return `UnexpectedEof`
+    /// if the position is at or past the buffer end.
+    pub fn seek(&mut self, pos: usize) {
+        self.pos = pos.min(self.bytes.len());
+    }
+
     /// UE-style length-prefixed string.
     /// - 0   => empty string
     /// - >0  => ASCII/UTF-8; length includes optional null terminator (stripped if present)
@@ -287,6 +296,26 @@ mod tests {
         let arr: [u8; 4] = r.read_array().unwrap();
         assert_eq!(arr, [0xDE, 0xAD, 0xBE, 0xEF]);
         assert_eq!(r.position(), 4);
+    }
+
+    #[test]
+    fn seek_sets_position() {
+        let mut r = Reader::new(&[1, 2, 3, 4, 5]);
+        r.seek(3);
+        assert_eq!(r.position(), 3);
+        assert_eq!(r.read_u8().unwrap(), 4);
+    }
+
+    #[test]
+    fn seek_clamps_to_buffer_end() {
+        // seek past the end is clamped, not an error — callers must bounds-check before reads.
+        let mut r = Reader::new(&[1, 2, 3]);
+        r.seek(100);
+        assert_eq!(r.position(), 3); // clamped to len
+        assert_eq!(r.remaining(), 0);
+        // Subsequent read fails cleanly with EOF
+        let err = r.read_u8().unwrap_err();
+        assert!(matches!(err, Error::UnexpectedEof { wanted: 1, available: 0, at: 3 }));
     }
 
     #[test]
