@@ -5,3 +5,9 @@ Cargo.lock.bak
 .vscode/
 *.swp
 *.swo
+
+# Live save fixtures dropped into test-saves/ — never commit; they contain
+# session names, save identifiers, mod metadata, and other personal data.
+/test-saves/*
+!/test-saves/README.md
+!/test-saves/.gitkeep
