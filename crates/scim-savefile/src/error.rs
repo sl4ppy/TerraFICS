@@ -20,6 +20,9 @@ pub enum Error {
     #[error("unsupported save_version {found} (only >= 41 is supported by this build)")]
     UnsupportedSaveVersion { found: i32 },
 
+    #[error("unsupported compression_format {found} (only zlib = 3 is supported)")]
+    UnsupportedCompressionFormat { found: u8 },
+
     #[error("invalid UTF-8 in string at offset {at}: {source}")]
     InvalidUtf8 {
         at: usize,

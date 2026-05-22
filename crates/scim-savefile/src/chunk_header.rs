@@ -40,6 +40,16 @@ pub fn read_chunk_header(r: &mut Reader<'_>, save_version: i32) -> Result<ChunkH
     let package_file_tag = u64::from_le_bytes(bytes[0..8].try_into().expect("8-byte slice"));
     let max_chunk_size = u64::from_le_bytes(bytes[8..16].try_into().expect("8-byte slice"));
     let compression_format = bytes[16];
+    if compression_format != COMPRESSION_FORMAT_ZLIB {
+        return Err(Error::UnsupportedCompressionFormat {
+            found: compression_format,
+        });
+    }
+    // NOTE: compressed_size on disk is a u64 (bytes 17-24) but we read only the
+    // low 32 bits. Satisfactory caps individual chunks at `max_chunk_size`
+    // (typically 0x20000 = 128 KB), so the high 32 bits are always zero in
+    // practice. If a future game version ever emits chunks > 4 GB, this read
+    // will silently truncate — revisit then.
     let compressed_size = u32::from_le_bytes(bytes[17..21].try_into().expect("4-byte slice"));
     let uncompressed_size = u64::from_le_bytes(bytes[25..33].try_into().expect("8-byte slice"));
 
@@ -113,5 +123,15 @@ mod tests {
                 at: 0
             }
         ));
+    }
+
+    #[test]
+    fn read_chunk_header_rejects_non_zlib_compression() {
+        // Build a chunk header with a bogus compression_format byte
+        let mut b = synth_chunk_header_v41(0x9E2A_83C1_u64, 0x20000, 12, 24);
+        b[16] = 0xFF;
+        let mut r = Reader::new(&b);
+        let err = read_chunk_header(&mut r, 46).unwrap_err();
+        assert!(matches!(err, Error::UnsupportedCompressionFormat { found: 0xFF }));
     }
 }
