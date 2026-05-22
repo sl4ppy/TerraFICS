@@ -96,6 +96,7 @@ enum Outcome {
     SkippedOldFormat { save_version: i32 },
 }
 
+#[allow(clippy::too_many_lines)] // sequential diagnostic pipeline; splitting would obscure flow
 fn parse_one(path: &Path) -> Result<Outcome, String> {
     let bytes = fs::read(path).map_err(|e| format!("read {}: {e}", path.display()))?;
 
@@ -180,6 +181,45 @@ fn parse_one(path: &Path) -> Result<Outcome, String> {
         }
         Err(e) => {
             return Err(format!("envelope walk: {e}"));
+        }
+    }
+
+    // Stream actors (P1.2-b2).
+    match scim_savefile::read_body_envelope(&body, &header) {
+        Ok(env) => {
+            let mut total = 0_usize;
+            let mut actor_count = 0_usize;
+            let mut object_count = 0_usize;
+            let mut first_failure: Option<String> = None;
+            for r in scim_savefile::stream_actors(&env, &header) {
+                match r {
+                    Ok(a) => {
+                        total += 1;
+                        match a.header.kind {
+                            scim_savefile::object_header::ObjectKind::Object => object_count += 1,
+                            scim_savefile::object_header::ObjectKind::Actor => actor_count += 1,
+                        }
+                    }
+                    Err(e) => {
+                        if first_failure.is_none() {
+                            first_failure = Some(e.to_string());
+                        }
+                    }
+                }
+            }
+            eprintln!(
+                "      actors: {total} total ({object_count} objects + {actor_count} actors)"
+            );
+            if let Some(msg) = first_failure {
+                eprintln!("      FIRST FAILURE: {msg}");
+                return Err(format!("actor stream had failures (first: {msg})"));
+            }
+        }
+        Err(scim_savefile::Error::UnsupportedSaveVersion { .. }) => {
+            // Already reported by the envelope walk above.
+        }
+        Err(e) => {
+            return Err(format!("re-envelope for actor stream: {e}"));
         }
     }
 
