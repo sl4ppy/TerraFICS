@@ -515,6 +515,45 @@ mod tests {
     }
 
     #[test]
+    fn walks_sublevel_with_non_empty_collectables() {
+        // Save_version 46 (NOT the >= 51 leap-of-faith path) to keep the test focused on
+        // the collectables-skip behavior alone.
+        let objects = vec![0xAA_u8; 4];
+        let entities = vec![0xBB_u8; 6];
+
+        let mut body = Vec::new();
+        body.extend_from_slice(&0_u64.to_le_bytes()); // length prefix
+        body.extend_from_slice(&1_i32.to_le_bytes()); // nb_levels = 1
+
+        // One sub-level WITH a non-empty collectables block.
+        write_ascii(&mut body, "SubA");
+        body.extend_from_slice(&i64::try_from(objects.len()).unwrap().to_le_bytes());
+        body.extend_from_slice(&objects);
+        body.extend_from_slice(&i64::try_from(entities.len()).unwrap().to_le_bytes());
+        body.extend_from_slice(&entities);
+
+        // countCollected = 2, then 2 collectables (each: 2 strings).
+        body.extend_from_slice(&2_i32.to_le_bytes());
+        write_ascii(&mut body, "/Game/MapName"); // first collectable: "level" string
+        write_ascii(&mut body, "Persistent.Foo_123"); //   pathName
+        write_ascii(&mut body, "/Game/MapName"); // second collectable
+        write_ascii(&mut body, "Persistent.Foo_124");
+
+        // Main level (empty)
+        body.extend_from_slice(&0_i64.to_le_bytes()); // objects_binary_length = 0
+        body.extend_from_slice(&0_i64.to_le_bytes()); // entities_binary_length = 0
+
+        let header = synth_header(46, false, "MapName");
+        let env = read_body_envelope(&body, &header).unwrap();
+        assert_eq!(env.levels.len(), 2);
+        assert_eq!(env.levels[0].name, "SubA");
+        // Main level should have empty ranges that point past the collectables block.
+        assert_eq!(env.levels[1].name, "Level MapName");
+        assert!(env.levels[1].objects_byte_range.is_empty());
+        assert!(env.levels[1].entities_byte_range.is_empty());
+    }
+
+    #[test]
     fn sub_level_save_version_discovered_via_leap_of_faith_at_save_version_52() {
         // For save_version >= 51, sub-levels have a trailing u32 with the per-sublevel
         // save_version. We use 49 (an arbitrary plausible value) here.
