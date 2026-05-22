@@ -59,6 +59,13 @@ impl<'a> Reader<'a> {
         Ok(self.take(n)?.to_vec())
     }
 
+    /// Read exactly N bytes into a fixed-size array. Zero-alloc for the array itself.
+    pub fn read_array<const N: usize>(&mut self) -> Result<[u8; N]> {
+        let bytes = self.take(N)?;
+        // Length is statically N because take returns exactly N bytes; the try_into is infallible.
+        Ok(bytes.try_into().expect("take returned exactly N bytes"))
+    }
+
     /// UE-style length-prefixed string.
     /// - 0   => empty string
     /// - >0  => ASCII/UTF-8; length includes optional null terminator (stripped if present)
@@ -267,5 +274,20 @@ mod tests {
         let mut r = Reader::new(&bytes);
         let err = r.read_string().unwrap_err();
         assert!(matches!(err, Error::UnexpectedEof { .. }));
+    }
+
+    #[test]
+    fn read_array_returns_fixed_size_array() {
+        let mut r = Reader::new(&[0xDE, 0xAD, 0xBE, 0xEF, 0xFF]);
+        let arr: [u8; 4] = r.read_array().unwrap();
+        assert_eq!(arr, [0xDE, 0xAD, 0xBE, 0xEF]);
+        assert_eq!(r.position(), 4);
+    }
+
+    #[test]
+    fn read_array_at_eof_errors() {
+        let mut r = Reader::new(&[0x01, 0x02]);
+        let err = r.read_array::<4>().unwrap_err();
+        assert!(matches!(err, Error::UnexpectedEof { wanted: 4, available: 2, at: 0 }));
     }
 }

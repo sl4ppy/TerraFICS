@@ -27,7 +27,7 @@ pub struct Header {
     pub is_modded_save: Option<i32>,
     pub save_identifier: Option<String>,
     pub is_partitioned_world: Option<i32>,
-    pub save_data_hash: Option<Vec<u8>>,
+    pub save_data_hash: Option<[u8; 20]>,     // >= 13, 20 bytes
     pub is_creative_mode_enabled: Option<i32>,
 }
 
@@ -81,7 +81,7 @@ pub fn read_header(bytes: &[u8]) -> Result<(Header, usize)> {
         if save_header_type >= HAS_PARTITIONED_WORLD_FROM {
             (
                 Some(r.read_i32()?),
-                Some(r.read_hex(20)?),
+                Some(r.read_array::<20>()?),
                 Some(r.read_i32()?),
             )
         } else {
@@ -184,7 +184,7 @@ mod tests {
         assert_eq!(h.is_modded_save, Some(0));
         assert_eq!(h.save_identifier.as_deref(), Some("ABC123"));
         assert_eq!(h.is_partitioned_world, Some(1));
-        assert_eq!(h.save_data_hash.as_deref(), Some(&[0xAA; 20][..]));
+        assert_eq!(h.save_data_hash, Some([0xAA; 20]));
         assert_eq!(h.is_creative_mode_enabled, Some(1));
         assert_eq!(consumed, bytes.len());
     }
