@@ -81,6 +81,21 @@ fn main() -> ExitCode {
             #[allow(clippy::cast_precision_loss)] // display-only ratio
             let ratio = body.len() as f64 / compressed.max(1) as f64;
             println!("expansion_ratio:     {ratio:.2}x");
+
+            // Walk the envelope + stream actors for diagnostic output.
+            match scim_savefile::read_body_envelope(&body, &h) {
+                Ok(env) => {
+                    println!("levels:              {}", env.levels.len());
+                    let mut total = 0_usize;
+                    for r in scim_savefile::stream_actors(&env, &h) {
+                        if r.is_ok() {
+                            total += 1;
+                        }
+                    }
+                    println!("actors:              {total}");
+                }
+                Err(e) => eprintln!("warning: envelope: {e}"),
+            }
         }
         Err(e) => {
             eprintln!("warning: body decompression failed: {e}");
