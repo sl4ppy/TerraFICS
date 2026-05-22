@@ -73,12 +73,46 @@ pub fn read_array_property(
     let mut values = Vec::with_capacity(count_usize);
 
     if element_type == "Struct" {
-        // Task 4 will fill in. For now, surface as Unsupported so iterator stops cleanly.
-        let _ = (save_version, map_name, parent_type);
-        return Err(Error::UnsupportedPropertyType {
-            name: String::new(),
-            type_name: "Array<Struct>".to_string(),
-            at: r.position(),
+        let _ = parent_type;
+        // Inner-struct preamble (ue5_version < 1011):
+        let property_name = r.read_string()?;
+        let _struct_prop_marker = r.read_string()?; // "StructProperty"
+        let structure_size = r.read_i32()?;
+        let _padding_i32 = r.read_i32()?; // 0
+        let structure_subtype = r.read_string()?;
+        let struct_sub_guid = r.read_guid()?;
+        let _padding_u8 = r.read_u8()?;
+
+        let outer = ArrayStructOuter {
+            property_name,
+            structure_size,
+            structure_subtype: structure_subtype.clone(),
+            struct_sub_guid,
+        };
+
+        let per_element_len = if count_usize > 0 {
+            i32::try_from(usize::try_from(structure_size.max(0)).unwrap_or(0) / count_usize)
+                .unwrap_or(0)
+        } else {
+            0
+        };
+
+        for _ in 0..count_usize {
+            let elem = read_array_struct_element(
+                r,
+                save_version,
+                ue5_version,
+                map_name,
+                &structure_subtype,
+                per_element_len,
+            )?;
+            values.push(ArrayElement::Struct(elem));
+        }
+
+        return Ok(ArrayValue {
+            element_type,
+            struct_outer: Some(outer),
+            values,
         });
     }
 
@@ -121,6 +155,123 @@ pub fn read_array_property(
         struct_outer: None,
         values,
     })
+}
+
+/// Read a single element of `Array<Struct>`. The struct subtype was set ONCE in the
+/// array preamble (`structure_subtype`); per-element bytes are just the subtype-specific
+/// body. `per_element_len` is used for opaque-blob fallback on unknown subtypes.
+#[allow(clippy::too_many_lines)]
+#[allow(clippy::many_single_char_names)]
+fn read_array_struct_element(
+    r: &mut Reader<'_>,
+    save_version: i32,
+    ue5_version: u32,
+    map_name: &str,
+    subtype: &str,
+    per_element_len: i32,
+) -> Result<StructKind> {
+    let elem_start = r.position();
+    let len_usize = usize::try_from(per_element_len.max(0)).unwrap_or(0);
+
+    let kind = match subtype {
+        "Vector" | "Rotator" => {
+            let (x, y, z) = if save_version >= 41 {
+                (r.read_f64()?, r.read_f64()?, r.read_f64()?)
+            } else {
+                (
+                    f64::from(r.read_f32()?),
+                    f64::from(r.read_f32()?),
+                    f64::from(r.read_f32()?),
+                )
+            };
+            if subtype == "Vector" {
+                StructKind::Vector { x, y, z }
+            } else {
+                StructKind::Rotator { x, y, z }
+            }
+        }
+        "Vector2D" => {
+            let (x, y) = if save_version >= 41 {
+                (r.read_f64()?, r.read_f64()?)
+            } else {
+                (f64::from(r.read_f32()?), f64::from(r.read_f32()?))
+            };
+            StructKind::Vector2D { x, y }
+        }
+        "Quat" | "Vector4" => {
+            let (a, b, c, d) = if save_version >= 41 {
+                (r.read_f64()?, r.read_f64()?, r.read_f64()?, r.read_f64()?)
+            } else {
+                (
+                    f64::from(r.read_f32()?),
+                    f64::from(r.read_f32()?),
+                    f64::from(r.read_f32()?),
+                    f64::from(r.read_f32()?),
+                )
+            };
+            if subtype == "Quat" {
+                StructKind::Quat { a, b, c, d }
+            } else {
+                StructKind::Vector4 { a, b, c, d }
+            }
+        }
+        "LinearColor" => StructKind::LinearColor {
+            r: r.read_f32()?,
+            g: r.read_f32()?,
+            b: r.read_f32()?,
+            a: r.read_f32()?,
+        },
+        "Color" => StructKind::Color {
+            b: r.read_u8()?,
+            g: r.read_u8()?,
+            r: r.read_u8()?,
+            a: r.read_u8()?,
+        },
+        "Guid" => {
+            let arr = r.read_array::<16>()?;
+            StructKind::Guid(arr)
+        }
+        "IntPoint" => StructKind::IntPoint {
+            x: r.read_i32()?,
+            y: r.read_i32()?,
+        },
+        _ => {
+            // Nested-property fallback per element. On any failure or unsupported nested
+            // type, seek back and try an OpaqueBlob using per_element_len.
+            match crate::property::read_properties(
+                r,
+                save_version,
+                ue5_version,
+                map_name,
+                Some(subtype),
+            ) {
+                Ok(bag) if bag.first_unsupported.is_none() => StructKind::Nested(bag.properties),
+                _ => {
+                    r.seek(elem_start);
+                    if len_usize > 0 {
+                        match r.read_hex(len_usize) {
+                            Ok(bytes) => StructKind::OpaqueBlob(bytes),
+                            Err(_) => {
+                                return Err(Error::UnsupportedPropertyType {
+                                    name: String::new(),
+                                    type_name: format!("Array<Struct<{subtype}>>"),
+                                    at: elem_start,
+                                });
+                            }
+                        }
+                    } else {
+                        return Err(Error::UnsupportedPropertyType {
+                            name: String::new(),
+                            type_name: format!("Array<Struct<{subtype}>>"),
+                            at: elem_start,
+                        });
+                    }
+                }
+            }
+        }
+    };
+
+    Ok(kind)
 }
 
 #[cfg(test)]
@@ -181,13 +332,40 @@ mod tests {
     }
 
     #[test]
-    fn array_of_struct_returns_unsupported_until_task_4() {
+    fn decodes_array_of_vector_struct() {
         let mut bytes = Vec::new();
         write_ascii(&mut bytes, "StructProperty");
-        bytes.push(0);
-        bytes.extend_from_slice(&0_i32.to_le_bytes());
+        bytes.push(0); // padding
+        bytes.extend_from_slice(&2_i32.to_le_bytes()); // count = 2
+        // Inner Struct preamble (ue5 < 1011 path):
+        write_ascii(&mut bytes, "mVertexList"); // property_name
+        write_ascii(&mut bytes, "StructProperty");
+        bytes.extend_from_slice(&48_i32.to_le_bytes()); // structure_size = 2 * 24
+        bytes.extend_from_slice(&0_i32.to_le_bytes()); // padding
+        write_ascii(&mut bytes, "Vector"); // structure_subtype
+        bytes.extend_from_slice(&[0_u8; 16]); // struct_sub_guid (zero)
+        bytes.push(0); // padding
+        // Element 1
+        bytes.extend_from_slice(&1.0_f64.to_le_bytes());
+        bytes.extend_from_slice(&2.0_f64.to_le_bytes());
+        bytes.extend_from_slice(&3.0_f64.to_le_bytes());
+        // Element 2
+        bytes.extend_from_slice(&4.0_f64.to_le_bytes());
+        bytes.extend_from_slice(&5.0_f64.to_le_bytes());
+        bytes.extend_from_slice(&6.0_f64.to_le_bytes());
+
         let mut r = Reader::new(&bytes);
-        let err = read_array_property(&mut r, 46, 1000, "MapName", None).unwrap_err();
-        assert!(matches!(err, Error::UnsupportedPropertyType { .. }));
+        let v = read_array_property(&mut r, 46, 1000, "MapName", None).unwrap();
+        assert_eq!(v.element_type, "Struct");
+        let outer = v.struct_outer.expect("struct_outer");
+        assert_eq!(outer.structure_subtype, "Vector");
+        assert_eq!(v.values.len(), 2);
+        if let ArrayElement::Struct(StructKind::Vector { x, y, z }) = &v.values[0] {
+            assert!((x - 1.0).abs() < f64::EPSILON);
+            assert!((y - 2.0).abs() < f64::EPSILON);
+            assert!((z - 3.0).abs() < f64::EPSILON);
+        } else {
+            panic!("expected Struct(Vector) at index 0");
+        }
     }
 }
