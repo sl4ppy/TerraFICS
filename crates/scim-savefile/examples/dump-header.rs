@@ -57,7 +57,7 @@ fn main() -> ExitCode {
         println!("save_identifier:     {s}");
     }
     if let Some(v) = h.is_partitioned_world {
-        println!("is_partitioned_world:{v}");
+        println!("is_partitioned_world:  {v}");
     }
     if let Some(b) = &h.save_data_hash {
         let hex = b
