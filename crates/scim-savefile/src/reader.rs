@@ -16,9 +16,13 @@ impl<'a> Reader<'a> {
     }
 
     #[must_use]
-    pub const fn position(&self) -> usize { self.pos }
+    pub const fn position(&self) -> usize {
+        self.pos
+    }
     #[must_use]
-    pub const fn remaining(&self) -> usize { self.bytes.len().saturating_sub(self.pos) }
+    pub const fn remaining(&self) -> usize {
+        self.bytes.len().saturating_sub(self.pos)
+    }
 
     #[inline]
     fn take(&mut self, n: usize) -> Result<&'a [u8]> {
@@ -67,7 +71,11 @@ impl<'a> Reader<'a> {
                 let n = len.unsigned_abs() as usize;
                 let at = self.pos;
                 let bytes = self.take(n)?;
-                let end = if !bytes.is_empty() && bytes[n - 1] == 0 { n - 1 } else { n };
+                let end = if !bytes.is_empty() && bytes[n - 1] == 0 {
+                    n - 1
+                } else {
+                    n
+                };
                 std::str::from_utf8(&bytes[..end])
                     .map(str::to_owned)
                     .map_err(|source| Error::InvalidUtf8 { at, source })
@@ -90,7 +98,9 @@ impl<'a> Reader<'a> {
                     .chunks_exact(2)
                     .map(|c| u16::from_le_bytes([c[0], c[1]]))
                     .collect();
-                if units.last() == Some(&0) { units.pop(); }
+                if units.last() == Some(&0) {
+                    units.pop();
+                }
                 String::from_utf16(&units).map_err(|_| Error::InvalidUtf16 { at })
             }
         }
@@ -113,7 +123,14 @@ mod tests {
     fn read_u8_at_eof_errors() {
         let mut r = Reader::new(&[]);
         let err = r.read_u8().unwrap_err();
-        assert!(matches!(err, Error::UnexpectedEof { wanted: 1, available: 0, at: 0 }));
+        assert!(matches!(
+            err,
+            Error::UnexpectedEof {
+                wanted: 1,
+                available: 0,
+                at: 0
+            }
+        ));
     }
 
     #[test]
@@ -192,14 +209,28 @@ mod tests {
     fn read_i32_at_eof_errors() {
         let mut r = Reader::new(&[0x00, 0x00, 0x00]);
         let err = r.read_i32().unwrap_err();
-        assert!(matches!(err, Error::UnexpectedEof { wanted: 4, available: 3, at: 0 }));
+        assert!(matches!(
+            err,
+            Error::UnexpectedEof {
+                wanted: 4,
+                available: 3,
+                at: 0
+            }
+        ));
     }
 
     #[test]
     fn read_i64_at_eof_errors() {
         let mut r = Reader::new(&[0x01, 0x02, 0x03]);
         let err = r.read_i64().unwrap_err();
-        assert!(matches!(err, Error::UnexpectedEof { wanted: 8, available: 3, at: 0 }));
+        assert!(matches!(
+            err,
+            Error::UnexpectedEof {
+                wanted: 8,
+                available: 3,
+                at: 0
+            }
+        ));
     }
 
     #[test]
@@ -218,8 +249,10 @@ mod tests {
         // nothing valid after it. Total of 4 bytes.
         let mut bytes = vec![];
         bytes.extend_from_slice(&(-2_i32).to_le_bytes());
-        bytes.push(0x00); bytes.push(0xD8); // 0xD800 high surrogate (LE bytes)
-        bytes.push(0x00); bytes.push(0x00); // null code unit (stripped before from_utf16)
+        bytes.push(0x00);
+        bytes.push(0xD8); // 0xD800 high surrogate (LE bytes)
+        bytes.push(0x00);
+        bytes.push(0x00); // null code unit (stripped before from_utf16)
         let mut r = Reader::new(&bytes);
         let err = r.read_string().unwrap_err();
         assert!(matches!(err, Error::InvalidUtf16 { .. }));

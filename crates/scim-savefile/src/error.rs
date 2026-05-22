@@ -38,7 +38,11 @@ mod tests {
 
     #[test]
     fn unexpected_eof_message_is_actionable() {
-        let e = Error::UnexpectedEof { wanted: 4, available: 1, at: 42 };
+        let e = Error::UnexpectedEof {
+            wanted: 4,
+            available: 1,
+            at: 42,
+        };
         let s = e.to_string();
         assert!(s.contains('4'), "should mention bytes wanted: {s}");
         assert!(s.contains('1'), "should mention bytes available: {s}");
@@ -48,6 +52,9 @@ mod tests {
     #[test]
     fn unsupported_header_type_message_includes_value() {
         let e = Error::UnsupportedHeaderType { found: 123 };
-        assert!(e.to_string().contains("123"), "should include the bad value");
+        assert!(
+            e.to_string().contains("123"),
+            "should include the bad value"
+        );
     }
 }

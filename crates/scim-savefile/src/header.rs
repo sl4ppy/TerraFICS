@@ -2,14 +2,13 @@
 //!
 //! Cross-reference: SC-InteractiveMap/src/SaveParser/Read.js:30-69.
 
-use serde::{Deserialize, Serialize};
 use crate::error::{Error, Result};
 use crate::reader::Reader;
 use crate::versions::{
-    HAS_EDITOR_OBJECT_VERSION_FROM, HAS_MOD_METADATA_FROM,
-    HAS_PARTITIONED_WORLD_FROM, HAS_SAVE_IDENTIFIER_FROM,
-    HAS_SAVE_NAME_FROM, MAX_KNOWN_HEADER_TYPE, MIN_SUPPORTED_HEADER_TYPE,
+    HAS_EDITOR_OBJECT_VERSION_FROM, HAS_MOD_METADATA_FROM, HAS_PARTITIONED_WORLD_FROM,
+    HAS_SAVE_IDENTIFIER_FROM, HAS_SAVE_NAME_FROM, MAX_KNOWN_HEADER_TYPE, MIN_SUPPORTED_HEADER_TYPE,
 };
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Header {
@@ -39,7 +38,9 @@ pub fn read_header(bytes: &[u8]) -> Result<(Header, usize)> {
 
     let save_header_type = r.read_i32()?;
     if !(MIN_SUPPORTED_HEADER_TYPE..=MAX_KNOWN_HEADER_TYPE).contains(&save_header_type) {
-        return Err(Error::UnsupportedHeaderType { found: save_header_type });
+        return Err(Error::UnsupportedHeaderType {
+            found: save_header_type,
+        });
     }
 
     let save_version = r.read_i32()?;
@@ -47,7 +48,9 @@ pub fn read_header(bytes: &[u8]) -> Result<(Header, usize)> {
 
     let save_name = if save_header_type >= HAS_SAVE_NAME_FROM {
         Some(r.read_string()?)
-    } else { None };
+    } else {
+        None
+    };
 
     let map_name = r.read_string()?;
     let map_options = r.read_string()?;
@@ -58,29 +61,51 @@ pub fn read_header(bytes: &[u8]) -> Result<(Header, usize)> {
 
     let editor_object_version = if save_header_type >= HAS_EDITOR_OBJECT_VERSION_FROM {
         Some(r.read_i32()?)
-    } else { None };
+    } else {
+        None
+    };
 
     let (mod_metadata, is_modded_save) = if save_header_type >= HAS_MOD_METADATA_FROM {
         (Some(r.read_string()?), Some(r.read_i32()?))
-    } else { (None, None) };
+    } else {
+        (None, None)
+    };
 
     let save_identifier = if save_header_type >= HAS_SAVE_IDENTIFIER_FROM {
         Some(r.read_string()?)
-    } else { None };
+    } else {
+        None
+    };
 
     let (is_partitioned_world, save_data_hash, is_creative_mode_enabled) =
         if save_header_type >= HAS_PARTITIONED_WORLD_FROM {
-            (Some(r.read_i32()?), Some(r.read_hex(20)?), Some(r.read_i32()?))
+            (
+                Some(r.read_i32()?),
+                Some(r.read_hex(20)?),
+                Some(r.read_i32()?),
+            )
         } else {
             (None, None, None)
         };
 
     let header = Header {
-        save_header_type, save_version, build_version, save_name,
-        map_name, map_options, session_name, play_duration_seconds,
-        save_date_time, session_visibility, editor_object_version,
-        mod_metadata, is_modded_save, save_identifier,
-        is_partitioned_world, save_data_hash, is_creative_mode_enabled,
+        save_header_type,
+        save_version,
+        build_version,
+        save_name,
+        map_name,
+        map_options,
+        session_name,
+        play_duration_seconds,
+        save_date_time,
+        session_visibility,
+        editor_object_version,
+        mod_metadata,
+        is_modded_save,
+        save_identifier,
+        is_partitioned_world,
+        save_data_hash,
+        is_creative_mode_enabled,
     };
 
     Ok((header, r.position()))
@@ -144,7 +169,10 @@ mod tests {
         assert_eq!(h.save_header_type, 13);
         assert_eq!(h.save_version, 41);
         assert_eq!(h.build_version, 368_883);
-        assert_eq!(h.save_name, None, "save_name appears only at header_type >= 14");
+        assert_eq!(
+            h.save_name, None,
+            "save_name appears only at header_type >= 14"
+        );
         assert_eq!(h.map_name, "Persistent_Level");
         assert_eq!(h.map_options, "?listen");
         assert_eq!(h.session_name, "My Test Save");
@@ -183,8 +211,10 @@ mod tests {
         assert_eq!(h.save_header_type, 7);
         assert_eq!(h.save_name, None);
         assert_eq!(h.editor_object_version, Some(7));
-        assert_eq!(h.mod_metadata, None,
-            "mod_metadata appears only at header_type >= 8");
+        assert_eq!(
+            h.mod_metadata, None,
+            "mod_metadata appears only at header_type >= 8"
+        );
         assert_eq!(h.save_identifier, None);
         assert_eq!(h.is_partitioned_world, None);
     }
@@ -231,8 +261,11 @@ mod tests {
         let bytes = synth_header_type_14();
         let (h, consumed) = read_header(&bytes).unwrap();
         assert_eq!(h.save_header_type, 14);
-        assert_eq!(h.save_name.as_deref(), Some("MySave"),
-            "save_name appears only at header_type >= 14");
+        assert_eq!(
+            h.save_name.as_deref(),
+            Some("MySave"),
+            "save_name appears only at header_type >= 14"
+        );
         assert_eq!(h.map_name, "Persistent_Level");
         assert_eq!(h.session_name, "Session Name");
         assert_eq!(consumed, bytes.len());
