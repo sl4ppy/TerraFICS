@@ -10,3 +10,4 @@ pub mod header;
 pub mod reader;
 pub mod versions;
 pub use header::{read_header, Header};
+pub mod chunk_header;
