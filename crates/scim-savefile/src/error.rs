@@ -36,6 +36,13 @@ pub enum Error {
         #[source]
         source: miniz_oxide::inflate::DecompressError,
     },
+
+    #[error("chunk length mismatch at offset {at}: expected {expected} uncompressed bytes, got {actual}")]
+    ChunkLengthMismatch {
+        at: usize,
+        expected: u64,
+        actual: u64,
+    },
 }
 
 #[allow(unused_attributes)] // #[must_use] on type alias is not yet enforced by this rustc version but documents intent
