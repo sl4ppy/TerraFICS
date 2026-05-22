@@ -86,6 +86,18 @@ fn read_partitions(r: &mut Reader<'_>) -> Result<Partitions> {
     Ok(Partitions { head_hex_1, head_hex_2, data })
 }
 
+/// Consume the `countCollected` i32 and any following collectable records.
+/// Each collectable is two UE strings (levelName + pathName).
+/// Cross-reference: Read.js:487-504 (post-entities block for non-main sub-levels).
+fn skip_sub_level_collectables(r: &mut Reader<'_>) -> Result<()> {
+    let count_collected = r.read_i32()?;
+    for _ in 0..count_collected.max(0) {
+        r.read_string()?; // levelName
+        r.read_string()?; // pathName
+    }
+    Ok(())
+}
+
 #[allow(clippy::too_many_lines)] // Sequential parser with bounds checks, splitting would obscure flow
 fn read_level_scaffold(
     r: &mut Reader<'_>,
@@ -113,8 +125,9 @@ fn read_level_scaffold(
 
     if header.save_version >= 51 && !is_main_level {
         // Forward scan: skip the objects block, read entities_binary_length, skip the
-        // entities block, then read the trailing level_save_version (u32). Restore
-        // r.position() to objects_start when done so sequential parsing continues.
+        // entities block, then read the trailing level_save_version (u32), then consume
+        // the countCollected block (and, for >= 53, the data-package-version blob).
+        // Restore r.position() to objects_start when done so sequential parsing continues.
         let entities_pos = objects_start
             .checked_add(objects_binary_length_usize)
             .ok_or_else(|| Error::UnexpectedEof {
@@ -154,6 +167,8 @@ fn read_level_scaffold(
         }
         r.seek(after_entities);
         level_save_version = i32::try_from(r.read_u32()?).expect("save_version fits i32");
+        // Consume the post-entities trailing block (countCollected + collectables).
+        skip_sub_level_collectables(r)?;
         // Restore position so the caller continues at objects_start sequentially.
         r.seek(objects_start);
     }
@@ -199,10 +214,16 @@ fn read_level_scaffold(
     }
     r.seek(entities_end);
 
-    // For sub-levels at save_version >= 51, the trailing per-level save_version was
-    // already read during the leap of faith and is duplicated here; consume it.
-    if header.save_version >= 51 && !is_main_level {
-        let _duplicate_save_version = r.read_u32()?;
+    if !is_main_level {
+        // For sub-levels at save_version >= 51, the trailing per-level save_version was
+        // already read during the leap of faith and is duplicated here; consume it.
+        if header.save_version >= 51 {
+            let _duplicate_save_version = r.read_u32()?;
+        }
+        // All sub-levels (any save_version) have a countCollected + collectables block
+        // immediately after the entities block.  Each collectable is two UE strings
+        // (levelName + pathName).  Cross-reference: Read.js:487-504.
+        skip_sub_level_collectables(r)?;
     }
 
     Ok(LevelInfo {
@@ -435,6 +456,7 @@ mod tests {
         body.extend_from_slice(&objects_a);
         body.extend_from_slice(&i64::try_from(entities_a.len()).unwrap().to_le_bytes());
         body.extend_from_slice(&entities_a);
+        body.extend_from_slice(&0_i32.to_le_bytes()); // countCollected = 0
 
         // Sub-level B
         write_ascii(&mut body, "SubB");
@@ -442,6 +464,7 @@ mod tests {
         body.extend_from_slice(&objects_b);
         body.extend_from_slice(&i64::try_from(entities_b.len()).unwrap().to_le_bytes());
         body.extend_from_slice(&entities_b);
+        body.extend_from_slice(&0_i32.to_le_bytes()); // countCollected = 0
 
         // Main level (no name in stream)
         body.extend_from_slice(&i64::try_from(objects_main.len()).unwrap().to_le_bytes());
@@ -484,7 +507,8 @@ mod tests {
         body.extend_from_slice(&objects);
         body.extend_from_slice(&i64::try_from(entities.len()).unwrap().to_le_bytes());
         body.extend_from_slice(&entities);
-        body.extend_from_slice(&49_u32.to_le_bytes()); // trailing per-sublevel save_version
+        body.extend_from_slice(&49_u32.to_le_bytes()); // trailing per-sublevel save_version (>= 51)
+        body.extend_from_slice(&0_i32.to_le_bytes()); // countCollected = 0
 
         // Main level
         body.extend_from_slice(&i64::try_from(objects_main.len()).unwrap().to_le_bytes());
