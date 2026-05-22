@@ -176,6 +176,53 @@ pub fn read_property(
     }))
 }
 
+/// Result of walking a property bag.
+#[derive(Debug, Default)]
+pub struct PropertyBag {
+    pub properties: Vec<Property>,
+    /// Set when the iterator stopped because of an unsupported property type (rather
+    /// than the `"None"` sentinel). Holds the type name so callers can tally what's
+    /// missing in P1.3-a.
+    pub first_unsupported: Option<UnsupportedHit>,
+}
+
+#[derive(Debug, Clone)]
+pub struct UnsupportedHit {
+    pub property_name: String,
+    pub type_name: String,
+    pub at: usize,
+}
+
+/// Loop `read_property` until the `"None"` sentinel OR an `UnsupportedPropertyType`
+/// error.
+pub fn read_properties(
+    r: &mut Reader<'_>,
+    save_version: i32,
+    ue5_version: u32,
+    map_name: &str,
+) -> Result<PropertyBag> {
+    let mut bag = PropertyBag::default();
+    loop {
+        match read_property(r, save_version, ue5_version, map_name) {
+            Ok(Some(p)) => bag.properties.push(p),
+            Ok(None) => return Ok(bag),
+            Err(Error::UnsupportedPropertyType {
+                name,
+                type_name,
+                at,
+            }) => {
+                bag.first_unsupported = Some(UnsupportedHit {
+                    property_name: name,
+                    type_name,
+                    at,
+                });
+                return Ok(bag);
+            }
+            Err(other) => return Err(other),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -353,6 +400,46 @@ mod tests {
             }
             other => panic!("expected SoftObjectRef, got {other:?}"),
         }
+    }
+
+    #[test]
+    fn iterates_until_none_sentinel() {
+        let mut bytes = Vec::new();
+        // Property 1: Int
+        write_header(&mut bytes, "mA", "IntProperty", 4, 0);
+        write_no_guid(&mut bytes);
+        bytes.extend_from_slice(&1_i32.to_le_bytes());
+        // Property 2: Float
+        write_header(&mut bytes, "mB", "FloatProperty", 4, 0);
+        write_no_guid(&mut bytes);
+        bytes.extend_from_slice(&2.5_f32.to_le_bytes());
+        // None sentinel
+        write_ascii(&mut bytes, "None");
+
+        let mut r = Reader::new(&bytes);
+        let bag = read_properties(&mut r, 46, 1000, "MapName").unwrap();
+        assert_eq!(bag.properties.len(), 2);
+        assert_eq!(bag.properties[0].name, "mA");
+        assert_eq!(bag.properties[1].name, "mB");
+        assert!(bag.first_unsupported.is_none());
+    }
+
+    #[test]
+    fn iterator_stops_on_unsupported_type() {
+        let mut bytes = Vec::new();
+        // Property 1: Int (succeeds)
+        write_header(&mut bytes, "mA", "IntProperty", 4, 0);
+        write_no_guid(&mut bytes);
+        bytes.extend_from_slice(&1_i32.to_le_bytes());
+        // Property 2: Array (unsupported in P1.3-a)
+        write_header(&mut bytes, "mList", "ArrayProperty", 0, 0);
+
+        let mut r = Reader::new(&bytes);
+        let bag = read_properties(&mut r, 46, 1000, "MapName").unwrap();
+        assert_eq!(bag.properties.len(), 1);
+        let hit = bag.first_unsupported.expect("expected unsupported hit");
+        assert_eq!(hit.property_name, "mList");
+        assert_eq!(hit.type_name, "Array");
     }
 
     #[test]
