@@ -19,3 +19,5 @@ pub use header::{read_header, Header};
 pub mod body;
 pub mod chunk_header;
 pub use body::read_body;
+pub mod body_envelope;
+pub use body_envelope::{BodyEnvelope, LevelInfo, Partitions, PartitionData, PartitionLevel, read_body_envelope};
