@@ -48,6 +48,11 @@ impl<'a> Reader<'a> {
         Ok(i32::from_le_bytes([b[0], b[1], b[2], b[3]]))
     }
 
+    pub fn read_u32(&mut self) -> Result<u32> {
+        let b = self.take(4)?;
+        Ok(u32::from_le_bytes([b[0], b[1], b[2], b[3]]))
+    }
+
     pub fn read_i64(&mut self) -> Result<i64> {
         let b = self.take(8)?;
         let mut buf = [0u8; 8];
@@ -296,5 +301,19 @@ mod tests {
                 at: 0
             }
         ));
+    }
+
+    #[test]
+    fn read_u32_is_little_endian() {
+        let mut r = Reader::new(&[0x78, 0x56, 0x34, 0x12]);
+        assert_eq!(r.read_u32().unwrap(), 0x1234_5678_u32);
+        assert_eq!(r.position(), 4);
+    }
+
+    #[test]
+    fn read_u32_at_eof_errors() {
+        let mut r = Reader::new(&[0x00, 0x01, 0x02]);
+        let err = r.read_u32().unwrap_err();
+        assert!(matches!(err, Error::UnexpectedEof { wanted: 4, available: 3, at: 0 }));
     }
 }
