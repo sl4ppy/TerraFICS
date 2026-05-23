@@ -11,5 +11,8 @@ thiserror.workspace   = true
 serde                 = { workspace = true, features = ["derive"] }
 miniz_oxide.workspace = true
 
+[dev-dependencies]
+scim-model = { path = "../scim-model" }
+
 [lints]
 workspace = true

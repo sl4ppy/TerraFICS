@@ -272,5 +272,45 @@ fn parse_one(path: &Path) -> Result<Outcome, String> {
         );
     }
 
+    // Classify actors via scim-model Registry + decode ConveyorBelt extras (P1.3-c).
+    if header.save_version < 53 {
+        if let Ok(env) = scim_savefile::read_body_envelope(&body, &header) {
+            use scim_model::{ClassKind, Component, ConveyorBelt, Registry};
+            let registry = Registry::new();
+            let mut by_kind: std::collections::HashMap<ClassKind, usize> =
+                std::collections::HashMap::new();
+            let mut belts_decoded = 0_usize;
+            let mut belt_items_total = 0_usize;
+            for r in scim_savefile::stream_actors(&env, &header) {
+                let Ok(actor) = r else { continue };
+                let kind = registry.classify(&actor.header.class_name);
+                *by_kind.entry(kind).or_default() += 1;
+                if matches!(kind, ClassKind::ConveyorBelt | ClassKind::ConveyorLift) {
+                    let level_save_version = env
+                        .levels
+                        .iter()
+                        .find(|l| l.name == actor.level_name)
+                        .map_or(header.save_version, |l| l.save_version);
+                    if let Ok(eb) = scim_savefile::parse_entity_body(
+                        &actor,
+                        level_save_version,
+                        1000,
+                        &header.map_name,
+                    ) {
+                        if let Ok(belt) = ConveyorBelt::decode(&actor, &eb) {
+                            belts_decoded += 1;
+                            belt_items_total += belt.items.len();
+                        }
+                    }
+                }
+            }
+            let belt_total = by_kind.get(&ClassKind::ConveyorBelt).copied().unwrap_or(0)
+                + by_kind.get(&ClassKind::ConveyorLift).copied().unwrap_or(0);
+            eprintln!(
+                "      classify: {belt_total} belt/lift actors ({belts_decoded} decoded, {belt_items_total} items)"
+            );
+        }
+    }
+
     Ok(Outcome::Parsed)
 }

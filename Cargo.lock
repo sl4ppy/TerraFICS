@@ -120,6 +120,7 @@ name = "scim-savefile"
 version = "0.1.0"
 dependencies = [
  "miniz_oxide",
+ "scim-model",
  "serde",
  "thiserror",
 ]
