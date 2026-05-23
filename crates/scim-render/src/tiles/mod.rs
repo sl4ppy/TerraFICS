@@ -20,8 +20,6 @@ use crate::tiles::loader::LoaderHandle;
 
 /// Cap on the number of resident tiles in VRAM. 256 tiles * 256x256 RGBA
 /// = 64 MB; comfortable on any desktop GPU.
-// reason: used by Task 5 eviction logic; skeleton precedes that implementation
-#[allow(dead_code)]
 const MAX_RESIDENT_TILES: usize = 256;
 
 /// Unit-quad vertex layout for the tile pipeline. Tile pass uses [0, 1]
@@ -43,8 +41,6 @@ const TILE_INDICES: &[u16] = &[0, 1, 2, 2, 1, 3];
 
 /// Off-screen tile pass — pipeline + tile cache + loader handle.
 /// Constructed by `Renderer` when `set_tile_root(Some(_))` is called.
-// reason: all fields are used by Task 5 (update/encode) and Task 6 (Renderer integration); skeleton precedes those implementations
-#[allow(dead_code)]
 #[derive(Debug)]
 pub struct TilePass {
     pipeline: wgpu::RenderPipeline,
@@ -67,8 +63,6 @@ pub struct TilePass {
 
 /// One resident tile's GPU resources + LRU metadata. Built when a tile
 /// arrives from the loader.
-// reason: bind_group and last_touched_frame are used by Task 5 draw and LRU eviction; skeleton precedes that implementation
-#[allow(dead_code)]
 #[derive(Debug)]
 struct ResidentTile {
     _texture: wgpu::Texture,
@@ -210,6 +204,158 @@ impl TilePass {
             failed: std::collections::HashSet::new(),
             frame_counter: 0,
             loader,
+        }
+    }
+
+    /// Drive the loader + cache for the current frame. Computes the
+    /// visible tile set from the camera, enqueues missing tiles, drains
+    /// the loader response channel, and evicts LRU once over budget.
+    /// Returns the visible tile set so `encode` can iterate it.
+    pub fn update(
+        &mut self,
+        device: &wgpu::Device,
+        queue: &wgpu::Queue,
+        camera_units_per_pixel: f32,
+        camera_world_aabb: [f32; 4],
+    ) -> Vec<TileKey> {
+        self.frame_counter = self.frame_counter.wrapping_add(1);
+
+        let zoom = crate::tiles::coord::tile_zoom_for(camera_units_per_pixel);
+        let visible = crate::tiles::coord::visible_tiles(zoom, camera_world_aabb);
+
+        // Drain decoded tiles delivered since last frame.
+        for delivered in self.loader.drain_ready() {
+            self.in_flight.remove(&delivered.key);
+            match delivered.result {
+                Ok(bytes) => {
+                    let resident =
+                        self.create_resident_tile(device, queue, delivered.key, &bytes);
+                    self.resident.insert(delivered.key, resident);
+                }
+                Err(_) => {
+                    self.failed.insert(delivered.key);
+                }
+            }
+        }
+
+        // For each visible tile: touch if resident, else enqueue load.
+        for key in &visible {
+            if let Some(r) = self.resident.get_mut(key) {
+                r.last_touched_frame = self.frame_counter;
+            } else if !self.in_flight.contains(key) && !self.failed.contains(key) && self.loader.request(*key) {
+                self.in_flight.insert(*key);
+            }
+        }
+
+        // LRU eviction if over budget.
+        if self.resident.len() > MAX_RESIDENT_TILES {
+            let mut by_age: Vec<(TileKey, u64)> = self
+                .resident
+                .iter()
+                .map(|(k, r)| (*k, r.last_touched_frame))
+                .collect();
+            by_age.sort_by_key(|(_, age)| *age);
+            let to_drop = self.resident.len() - MAX_RESIDENT_TILES;
+            for (key, _) in by_age.into_iter().take(to_drop) {
+                self.resident.remove(&key);
+            }
+        }
+
+        visible
+    }
+
+    /// Encode tile draws into the active render pass. Called between the
+    /// pass clear and the footprint draws.
+    pub fn encode<'pass>(
+        &'pass self,
+        pass: &mut wgpu::RenderPass<'pass>,
+        camera_bg: &'pass wgpu::BindGroup,
+        visible: &[TileKey],
+    ) {
+        pass.set_pipeline(&self.pipeline);
+        pass.set_bind_group(0, camera_bg, &[]);
+        pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
+        pass.set_index_buffer(self.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
+        let index_count = u32::try_from(TILE_INDICES.len()).expect("6 indices fit u32");
+        for key in visible {
+            if let Some(r) = self.resident.get(key) {
+                pass.set_bind_group(1, &r.bind_group, &[]);
+                pass.draw_indexed(0..index_count, 0, 0..1);
+            }
+        }
+    }
+
+    fn create_resident_tile(
+        &self,
+        device: &wgpu::Device,
+        queue: &wgpu::Queue,
+        key: TileKey,
+        rgba: &[u8],
+    ) -> ResidentTile {
+        let size = wgpu::Extent3d {
+            width: crate::tiles::coord::TILE_PIXEL_SIZE,
+            height: crate::tiles::coord::TILE_PIXEL_SIZE,
+            depth_or_array_layers: 1,
+        };
+        let texture = device.create_texture(&wgpu::TextureDescriptor {
+            label: Some("scim-render tile texture"),
+            size,
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D2,
+            format: wgpu::TextureFormat::Rgba8UnormSrgb,
+            usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
+            view_formats: &[],
+        });
+        queue.write_texture(
+            wgpu::ImageCopyTexture {
+                texture: &texture,
+                mip_level: 0,
+                origin: wgpu::Origin3d::ZERO,
+                aspect: wgpu::TextureAspect::All,
+            },
+            rgba,
+            wgpu::ImageDataLayout {
+                offset: 0,
+                bytes_per_row: Some(crate::tiles::coord::TILE_PIXEL_SIZE * 4),
+                rows_per_image: Some(crate::tiles::coord::TILE_PIXEL_SIZE),
+            },
+            size,
+        );
+        let view = texture.create_view(&wgpu::TextureViewDescriptor::default());
+
+        let aabb = crate::tiles::coord::tile_world_aabb(key.zoom, key.x, key.y);
+        let uniform = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("scim-render tile aabb uniform"),
+            contents: bytemuck::bytes_of(&aabb),
+            usage: wgpu::BufferUsages::UNIFORM,
+        });
+
+        let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("scim-render tile bg"),
+            layout: &self.tile_bgl,
+            entries: &[
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: wgpu::BindingResource::TextureView(&view),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: wgpu::BindingResource::Sampler(&self.sampler),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 2,
+                    resource: uniform.as_entire_binding(),
+                },
+            ],
+        });
+
+        ResidentTile {
+            _texture: texture,
+            _view: view,
+            _uniform: uniform,
+            bind_group,
+            last_touched_frame: self.frame_counter,
         }
     }
 }
