@@ -7,9 +7,7 @@ use std::path::PathBuf;
 use std::process::ExitCode;
 
 use scim_model::{ClassKind, Registry, TypedComponent};
-use scim_savefile::{
-    parse_entity_body, read_body, read_body_envelope, read_header, stream_actors,
-};
+use scim_savefile::{parse_entity_body, read_body, read_body_envelope, read_header, stream_actors};
 
 fn main() -> ExitCode {
     let Some(path) = std::env::args().nth(1) else {

@@ -628,9 +628,15 @@ mod tests {
             path_name: "Foo".to_string(),
         };
         let val = PropertyValue::ObjectRef(obj.clone());
-        assert_eq!(val.as_object_ref().map(|o| o.path_name.as_str()), Some("Foo"));
+        assert_eq!(
+            val.as_object_ref().map(|o| o.path_name.as_str()),
+            Some("Foo")
+        );
         let val2 = PropertyValue::InterfaceRef(obj);
-        assert_eq!(val2.as_object_ref().map(|o| o.path_name.as_str()), Some("Foo"));
+        assert_eq!(
+            val2.as_object_ref().map(|o| o.path_name.as_str()),
+            Some("Foo")
+        );
         assert_eq!(PropertyValue::Int(1).as_object_ref(), None);
     }
 

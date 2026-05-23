@@ -1,12 +1,18 @@
 //! Typed game-domain model on top of the byte-level `scim-savefile` parser.
 //!
-//! Capability lands incrementally across P1.3-c tasks:
-//! - Task 3: `Error` / `Result`
-//! - Task 4: `ClassDef`, `ClassKind`, `ModId`
-//! - Task 5: `Registry`
-//! - Task 6: `Component` trait
-//! - Task 7: `ConveyorBelt` reference component
-//! - Task 8: `ModManifest` + TOML loader
+//! Provides:
+//! - `ClassDef` / `ClassKind`: classification of UE classes by gameplay role.
+//! - `Registry`: HashMap-backed lookup seeded from a built-in vanilla list
+//!   (Mk1-Mk6 belts/lifts, all chain-actor variants, splitter family, Mk1-Mk3
+//!   miners, Mk1/Mk2 pipelines + pumps, `FGResourceNode` subclasses) and
+//!   extensible via TOML mod manifests.
+//! - `Component` trait: per-class typed `decode` / `encode_into` / `affected_indices`.
+//! - `TypedComponent`: enum unioning all concrete Component impls; obtained
+//!   from `Registry::decode_for_actor`.
+//! - Concrete components: `ConveyorBelt`, `ConveyorChainActor`, `Splitter`,
+//!   `Miner`, `Pipeline`, `ResourceNode`.
+//!
+//! Roadmap: P2 adds the editable property model and `scim-store` snapshots.
 
 pub mod error;
 pub use error::{Error, Result};
