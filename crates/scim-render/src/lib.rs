@@ -14,6 +14,11 @@
 //! Perf targets (spec §6.6): 60 FPS at 1440p with ~1M actors indexed,
 //! ~150k visible. The footprint pass alone is well under budget at the
 //! P1.5-a corpus scale (17,974 instances).
+//!
+//! **P1.5-d scope (this milestone):** base map tile layer rendered under
+//! the actor footprints. Local PNG tiles only (no CDN fetch in this
+//! milestone); dynamic zoom selection by camera; lazy load on a
+//! background thread.
 
 pub mod error;
 pub use error::{Error, Result};
@@ -25,6 +30,8 @@ pub mod renderer;
 pub use renderer::Renderer;
 pub mod picking;
 pub use picking::PickPass;
+pub mod tiles;
+pub use tiles::TilePass;
 
 /// The `i64` row id of an actor in `scim-store`. Re-exported so consumers
 /// of `scim-render` don't have to pull in `scim-store` to talk about

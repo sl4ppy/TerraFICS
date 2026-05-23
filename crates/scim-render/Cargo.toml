@@ -10,6 +10,7 @@ license.workspace      = true
 scim-store = { path = "../scim-store", version = "0.1.0" }
 scim-world = { path = "../scim-world", version = "0.1.0" }
 thiserror  = { workspace = true }
+image      = { version = "=0.25.1", default-features = false, features = ["png"] }
 wgpu       = { workspace = true }
 winit      = { workspace = true }
 bytemuck   = { workspace = true }
