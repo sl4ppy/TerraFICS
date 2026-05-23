@@ -7,12 +7,12 @@
 //! - `read_body_envelope`: walk the body's outer structure (P1.2-b1)
 //! - `stream_actors`: iterate every (object header + entity body) pair across all
 //!   levels — zero-copy slices into the decompressed body (P1.2-b2)
-//! - `parse_entity_body`: decode actor preamble + ALL property types (primitives
-//!   from P1.3-a; composites Struct/Array/Map/Set/Enum/Byte/Text from P1.3-b).
-//!   Well-known struct subtypes decode to typed values; unknown struct subtypes
-//!   capture as `OpaqueBlob` so cursor advancement is always exact.
+//! - `parse_entity_body`: decode actor preamble + all property types (P1.3-a + b)
+//! - `read_inventory_item`: per-item wire primitive used by `ConveyorBelt` and other
+//!   inventory-holding components (P1.3-c)
 //!
-//! Roadmap: P1.3-c adds the `ClassDef` registry and the `Component` trait.
+//! See `scim-model` for the typed-domain layer (`Registry`, `ClassKind`, `Component`
+//! impls) that builds on these primitives.
 
 // modules added in later tasks
 pub mod error;
