@@ -14,6 +14,8 @@ pub mod classdef;
 pub use classdef::{ClassDef, ClassKind, ModId};
 pub mod component;
 pub use component::Component;
+pub mod manifest;
+pub use manifest::{load_manifest, load_manifests_from_dir, ModManifest, ModManifestEntry};
 pub mod registry;
 pub use registry::Registry;
 pub mod components;

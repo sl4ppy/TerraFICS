@@ -46,6 +46,20 @@ impl Registry {
         self.by_class_name.insert(def.class_name.clone(), def);
     }
 
+    /// Extend the registry with class definitions from a directory of TOML mod
+    /// manifests. Returns the number of class defs added.
+    pub fn extend_from_manifests(&mut self, dir: &std::path::Path) -> crate::error::Result<usize> {
+        let manifests = crate::manifest::load_manifests_from_dir(dir)?;
+        let mut added = 0_usize;
+        for m in manifests {
+            for def in m.to_class_defs() {
+                self.add_def(def);
+                added += 1;
+            }
+        }
+        Ok(added)
+    }
+
     #[must_use]
     pub fn len(&self) -> usize {
         self.by_class_name.len()
@@ -142,5 +156,24 @@ mod tests {
         ));
         let def = r.get("/Mod/MyBelt").expect("should be registered");
         assert_eq!(def.mod_origin.as_deref(), Some("my-mod"));
+    }
+
+    #[test]
+    fn extends_from_manifests_dir() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(
+            dir.path().join("a.toml"),
+            r#"mod_id = "x"
+
+[[classes]]
+class_name = "/X/Belt"
+kind = "ConveyorBelt"
+"#,
+        )
+        .unwrap();
+        let mut r = Registry::new();
+        let added = r.extend_from_manifests(dir.path()).unwrap();
+        assert_eq!(added, 1);
+        assert_eq!(r.classify("/X/Belt"), ClassKind::ConveyorBelt);
     }
 }
