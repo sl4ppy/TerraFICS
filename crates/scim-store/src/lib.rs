@@ -1,18 +1,20 @@
-//! SQLite-backed project store for parsed Satisfactory saves.
+//! `SQLite`-backed project store for parsed Satisfactory saves.
 //!
-//! P1.4 capability lands incrementally:
-//! - Task 2: `Error` / `Result`
-//! - Task 3: schema DDL
-//! - Task 4: `SQLite` tuning
-//! - Task 5: `Db` connection wrapper
-//! - Task 6: blob storage (content-addressed via blake3 + zstd)
-//! - Task 7: actor storage
-//! - Task 8: snapshot creation
-//! - Task 9: per-snapshot header JSON
-//! - Task 10: `import_save` end-to-end
-//! - Task 11: read API
+//! Per design spec §5: one project DB per save being tracked, with content-
+//! addressed blobs (`blake3` + `zstd`), immutable per-version actor rows, and
+//! a snapshot DAG (P1.4 creates exactly one snapshot per import; P2 adds
+//! per-edit child snapshots).
 //!
-//! Roadmap: P2 adds the edit path (immutable actor rows mean new rows per edit).
+//! Public API:
+//! - `Db::open(path)` — open or create a project DB with tuning + schema
+//!   applied.
+//! - `import_save(db, sav_path, label)` — parse a `.sav` and write a fresh
+//!   snapshot. Returns `ImportSummary`.
+//! - `list_snapshots`, `list_actors_in_snapshot`, `read_blob` — read API.
+//! - `header_store::insert_header`, `header_store::read_header` — per-snapshot
+//!   `Header` JSON.
+//!
+//! Roadmap: P2 adds per-edit snapshots and the save-as-`.sav` write path.
 
 pub mod error;
 pub use error::{Error, Result};
@@ -25,7 +27,9 @@ pub use db::Db;
 pub mod blob;
 pub use blob::{insert_blob_if_absent, read_blob, BlobHash};
 pub mod actor;
-pub use actor::{decode_transform, encode_transform, insert_actor, list_actors_in_snapshot, ActorRow};
+pub use actor::{
+    decode_transform, encode_transform, insert_actor, list_actors_in_snapshot, ActorRow,
+};
 pub mod snapshot;
 pub use snapshot::{add_actor_to_snapshot, create_snapshot, list_snapshots, SnapshotRow};
 pub mod header_store;

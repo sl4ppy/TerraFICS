@@ -5,9 +5,7 @@ use std::collections::HashSet;
 use std::path::Path;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use scim_savefile::{
-    read_body, read_body_envelope, read_header, stream_actors, ObjectHeaderBody,
-};
+use scim_savefile::{read_body, read_body_envelope, read_header, stream_actors, ObjectHeaderBody};
 
 use crate::actor::{encode_transform, insert_actor};
 use crate::blob::insert_blob_if_absent;
@@ -27,11 +25,7 @@ pub struct ImportSummary {
 
 /// Open `sav_path`, parse, import into `db` as a fresh snapshot.
 #[allow(clippy::cast_possible_wrap)]
-pub fn import_save<P: AsRef<Path>>(
-    db: &mut Db,
-    sav_path: P,
-    label: &str,
-) -> Result<ImportSummary> {
+pub fn import_save<P: AsRef<Path>>(db: &mut Db, sav_path: P, label: &str) -> Result<ImportSummary> {
     let sav_path = sav_path.as_ref();
     let bytes = std::fs::read(sav_path)?;
     let (header, consumed) = read_header(&bytes)?;

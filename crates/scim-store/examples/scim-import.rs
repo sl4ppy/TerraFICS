@@ -31,9 +31,10 @@ fn main() -> ExitCode {
         }
     };
 
-    let label = sav
-        .file_name()
-        .map_or_else(|| "unnamed".to_string(), |s| s.to_string_lossy().into_owned());
+    let label = sav.file_name().map_or_else(
+        || "unnamed".to_string(),
+        |s| s.to_string_lossy().into_owned(),
+    );
 
     let t0 = Instant::now();
     let summary = match import_save(&mut db, &sav, &label) {

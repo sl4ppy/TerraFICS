@@ -337,9 +337,10 @@ fn parse_one(path: &Path) -> Result<Outcome, String> {
         let db_path = dir.path().join("live_saves_import.scimdb");
         let mut store_db =
             scim_store::Db::open(&db_path).map_err(|e| format!("open store db: {e}"))?;
-        let label = path
-            .file_name()
-            .map_or_else(|| "unnamed".to_string(), |s| s.to_string_lossy().into_owned());
+        let label = path.file_name().map_or_else(
+            || "unnamed".to_string(),
+            |s| s.to_string_lossy().into_owned(),
+        );
         match scim_store::import::import_save(&mut store_db, path, &label) {
             Ok(summary) => {
                 eprintln!(

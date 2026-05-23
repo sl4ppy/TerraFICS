@@ -5,8 +5,8 @@ use std::path::PathBuf;
 use std::time::Instant;
 
 use scim_store::{
-    actor::list_actors_in_snapshot, blob::read_blob, import::import_save,
-    snapshot::list_snapshots, Db,
+    actor::list_actors_in_snapshot, blob::read_blob, import::import_save, snapshot::list_snapshots,
+    Db,
 };
 
 fn corpus_path(name: &str) -> PathBuf {
@@ -37,7 +37,10 @@ fn import_creative_test_sav_to_fresh_project() {
         elapsed.as_secs_f64()
     );
 
-    assert_eq!(summary.total_actors, 23941, "expected 23941 actors imported");
+    assert_eq!(
+        summary.total_actors, 23941,
+        "expected 23941 actors imported"
+    );
     assert_eq!(summary.failed_actors, 0, "no failed actors");
     assert!(summary.blobs_inserted > 0);
     assert!(summary.blobs_inserted <= summary.total_actors);
