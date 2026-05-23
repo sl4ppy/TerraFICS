@@ -6,5 +6,20 @@ version.workspace      = true
 authors.workspace      = true
 license.workspace      = true
 
+[dependencies]
+scim-savefile = { path = "../scim-savefile", version = "0.1.0" }
+scim-store    = { path = "../scim-store",    version = "0.1.0" }
+rusqlite      = { workspace = true }
+thiserror     = { workspace = true }
+rstar         = "0.12"
+
+[dev-dependencies]
+tempfile  = "=3.10.1"
+criterion = { workspace = true }
+
 [lints]
 workspace = true
+
+[[bench]]
+name    = "index_bench"
+harness = false
