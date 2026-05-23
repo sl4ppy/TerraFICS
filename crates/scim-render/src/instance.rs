@@ -29,8 +29,14 @@ pub struct Instance {
 /// but not meaningful — callers should not rely on it for picking
 /// (P1.5-c will introduce explicit actor-id passthrough).
 #[must_use]
-pub const fn build_instances(_index: &WorldIndex) -> Vec<Instance> {
-    Vec::new()
+pub fn build_instances(index: &WorldIndex) -> Vec<Instance> {
+    index
+        .iter()
+        .map(|placement| Instance {
+            position: placement.position,
+            _pad: 0.0,
+        })
+        .collect()
 }
 
 #[cfg(test)]
@@ -69,5 +75,33 @@ mod tests {
         ];
         let bytes = bytemuck::cast_slice::<Instance, u8>(&instances);
         assert_eq!(bytes.len(), 32);
+    }
+
+    #[test]
+    fn build_instances_emits_one_per_placement() {
+        use scim_world::{ActorPlacement, WorldIndex};
+
+        let placements = vec![
+            ActorPlacement { actor_id: 1, position: [10.0, 20.0, 30.0] },
+            ActorPlacement { actor_id: 2, position: [-5.0, 0.0, 0.0] },
+        ];
+        let idx = WorldIndex::from_placements(placements);
+
+        let instances = build_instances(&idx);
+        assert_eq!(instances.len(), 2);
+        // R-tree iteration order isn't position order — sort by x to check.
+        let mut by_x: Vec<&Instance> = instances.iter().collect();
+        by_x.sort_by(|a, b| a.position[0].partial_cmp(&b.position[0]).unwrap());
+        assert_eq!(by_x[0].position, [-5.0, 0.0, 0.0]);
+        assert_eq!(by_x[1].position, [10.0, 20.0, 30.0]);
+    }
+
+    #[test]
+    fn build_instances_empty_when_index_empty() {
+        use scim_world::WorldIndex;
+
+        let idx = WorldIndex::from_placements(Vec::new());
+        let instances = build_instances(&idx);
+        assert!(instances.is_empty());
     }
 }

@@ -59,6 +59,14 @@ impl WorldIndex {
         self.tree.size() == 0
     }
 
+    /// Iterate every `ActorPlacement` in the index in R-tree traversal
+    /// order. Order is stable for a given index but not semantically
+    /// meaningful — used by callers (e.g., `scim-render::build_instances`)
+    /// to materialize a flat vector.
+    pub fn iter(&self) -> impl Iterator<Item = &ActorPlacement> {
+        self.tree.iter()
+    }
+
     /// Iterate placements whose `(x, y)` falls within `[min, max]` (inclusive
     /// on both bounds — per `rstar` semantics). Returns references into the
     /// tree; clone if you need owned values.
@@ -165,6 +173,19 @@ mod tests {
     fn query_point_misses_when_no_placement_at_point() {
         let idx = WorldIndex::from_placements(vec![p(1, 0.0, 0.0)]);
         assert!(idx.query_point([10.0, 10.0]).next().is_none());
+    }
+
+    #[test]
+    fn world_index_iter_visits_every_placement() {
+        let placements = vec![
+            p(1, 0.0, 0.0),
+            p(2, 100.0, 200.0),
+            p(3, -50.0, 50.0),
+        ];
+        let idx = WorldIndex::from_placements(placements);
+        let mut seen: Vec<i64> = idx.iter().map(|pl| pl.actor_id).collect();
+        seen.sort_unstable();
+        assert_eq!(seen, vec![1, 2, 3]);
     }
 }
 
