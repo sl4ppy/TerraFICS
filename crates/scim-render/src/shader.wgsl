@@ -1,4 +1,4 @@
-// Vertex + fragment shader for the P1.5-b instanced footprint pass.
+// Vertex + fragment shader for the scim-render footprint pass.
 //
 // Layout:
 //   Group 0 Binding 0: camera uniform (mat4x4<f32>)
@@ -6,10 +6,11 @@
 //     @location(0) quad_pos: vec2<f32>   — corner of unit quad in [-0.5, 0.5]
 //   Instance attributes:
 //     @location(1) instance_pos: vec3<f32>  — world translation
-//     @location(2) _instance_pad: f32       — unused (round to 16 B)
+//     @location(2) flags: u32               — bit 0 = selected (P1.5-c)
 //
-// World scale per instance: 100 units (fixed for P1.5-b; per-class footprints
-// land with scim-assets work). One solid color output, light gray.
+// World scale per instance: 100 units (fixed; per-class footprints land
+// with scim-assets work). One solid color output, light gray; selected
+// actors are tinted (added in P1.5-c Task 2).
 
 struct CameraUniform {
     view_proj: mat4x4<f32>,
@@ -20,7 +21,7 @@ struct CameraUniform {
 struct VsIn {
     @location(0) quad_pos: vec2<f32>,
     @location(1) instance_pos: vec3<f32>,
-    @location(2) _instance_pad: f32,
+    @location(2) flags: u32,
 };
 
 struct VsOut {

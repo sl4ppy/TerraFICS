@@ -195,7 +195,7 @@ impl Renderer {
                         step_mode: wgpu::VertexStepMode::Instance,
                         attributes: &wgpu::vertex_attr_array![
                             1 => Float32x3,
-                            2 => Float32,
+                            2 => Uint32,
                         ],
                     },
                 ],

@@ -9,19 +9,25 @@ use scim_world::WorldIndex;
 
 /// One actor's GPU-side data for the footprint pass.
 ///
-/// Layout matches the `@location(1) instance_pos: vec3<f32>` binding in
-/// `shader.wgsl`. The `_pad` field exists so the struct is 16 B (vec4-sized);
-/// future fields (rotation quaternion, color slot index, selection bits)
-/// land in the same 16 B block or in extra vec4-aligned blocks.
-#[derive(Debug, Default, Clone, Copy, Pod, Zeroable)]
+/// Layout matches the `@location(1) instance_pos: vec3<f32>` +
+/// `@location(2) flags: u32` bindings in `shader.wgsl`. The struct is 16 B
+/// (vec4-sized) so future fields (rotation quaternion, footprint id, color
+/// slot) can be packed without re-laying out the buffer.
+#[derive(Debug, Default, Clone, Copy, PartialEq, Pod, Zeroable)]
 #[repr(C)]
 pub struct Instance {
     /// World-space translation `(x, y, z)` from the actor's transform.
     pub position: [f32; 3],
-    /// Padding to round the struct out to a vec4. Always 0.
-    // Intentional padding field; underscore name signals it is reserved, not a typo.
-    #[allow(clippy::pub_underscore_fields)]
-    pub _pad: f32,
+    /// Bit flags. `Instance::FLAG_SELECTED` (bit 0) is the only one defined
+    /// in P1.5-c. Future bits land with P1.5-f (palette / per-actor colour
+    /// slot) and scim-assets work (footprint id).
+    pub flags: u32,
+}
+
+impl Instance {
+    /// Bit flag indicating this instance is currently selected; the main
+    /// fragment shader tints it.
+    pub const FLAG_SELECTED: u32 = 1;
 }
 
 /// Walk a `WorldIndex` and emit one `Instance` per `ActorPlacement`.
@@ -35,14 +41,14 @@ pub fn build_instances(index: &WorldIndex) -> Vec<Instance> {
         .iter()
         .map(|placement| Instance {
             position: placement.position,
-            _pad: 0.0,
+            flags: 0,
         })
         .collect()
 }
 
 #[cfg(test)]
-#[allow(clippy::float_cmp)] // Comparisons are bit-for-bit copies through bytemuck — no arithmetic.
-#[allow(clippy::used_underscore_binding)] // Tests must access _pad to verify round-trip correctness.
+// reason: comparisons are bit-for-bit copies through bytemuck — no arithmetic involved.
+#[allow(clippy::float_cmp)]
 mod tests {
     use super::*;
 
@@ -62,13 +68,13 @@ mod tests {
     fn instance_round_trips_through_bytemuck_cast() {
         let original = Instance {
             position: [100.0, -200.0, 50.0],
-            _pad: 0.0,
+            flags: 0,
         };
         let bytes = bytemuck::bytes_of(&original);
         assert_eq!(bytes.len(), 16);
         let restored: &Instance = bytemuck::from_bytes(bytes);
         assert_eq!(restored.position, original.position);
-        assert_eq!(restored._pad, original._pad);
+        assert_eq!(restored.flags, original.flags);
     }
 
     #[test]
@@ -76,11 +82,11 @@ mod tests {
         let instances = vec![
             Instance {
                 position: [0.0, 0.0, 0.0],
-                _pad: 0.0,
+                flags: 0,
             },
             Instance {
                 position: [100.0, 100.0, 0.0],
-                _pad: 0.0,
+                flags: 0,
             },
         ];
         let bytes = bytemuck::cast_slice::<Instance, u8>(&instances);
@@ -119,5 +125,27 @@ mod tests {
         let idx = WorldIndex::from_placements(Vec::new());
         let instances = build_instances(&idx);
         assert!(instances.is_empty());
+    }
+
+    #[test]
+    fn instance_has_flags_field_and_selected_constant() {
+        let i = Instance {
+            position: [0.0, 0.0, 0.0],
+            flags: Instance::FLAG_SELECTED,
+        };
+        assert_eq!(i.flags & Instance::FLAG_SELECTED, Instance::FLAG_SELECTED);
+        assert_eq!(Instance::FLAG_SELECTED, 1);
+    }
+
+    #[test]
+    fn instance_flags_round_trip_through_bytemuck() {
+        let original = Instance {
+            position: [1.0, 2.0, 3.0],
+            flags: Instance::FLAG_SELECTED,
+        };
+        let bytes = bytemuck::bytes_of(&original);
+        let restored: &Instance = bytemuck::from_bytes(bytes);
+        assert_eq!(restored.position, original.position);
+        assert_eq!(restored.flags, Instance::FLAG_SELECTED);
     }
 }
