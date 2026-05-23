@@ -14,6 +14,7 @@ repository   = "https://github.com/sl4ppy/TerraFICS"
 thiserror   = "1.0"
 serde       = { version = "1.0", features = ["derive"] }
 miniz_oxide = { version = "0.7", features = ["std"] }
+toml        = "0.5"
 
 [workspace.lints.rust]
 unsafe_code = "deny"
