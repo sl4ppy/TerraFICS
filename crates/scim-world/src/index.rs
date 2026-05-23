@@ -45,6 +45,13 @@ impl WorldIndex {
         let env = rstar::AABB::from_corners(min, max);
         self.tree.locate_in_envelope(&env)
     }
+
+    /// Iterate placements whose `(x, y)` equals `point`. Returns all
+    /// coincident matches (picking disambiguation happens caller-side).
+    pub fn query_point(&self, point: [f32; 2]) -> impl Iterator<Item = &ActorPlacement> {
+        let env = rstar::AABB::from_point(point);
+        self.tree.locate_in_envelope(&env)
+    }
 }
 
 #[cfg(test)]
@@ -98,5 +105,33 @@ mod tests {
         // rstar's AABB envelopes are inclusive on both bounds.
         let idx = WorldIndex::from_placements(vec![p(1, 100.0, 100.0)]);
         assert_eq!(idx.query_aabb([100.0, 100.0], [100.0, 100.0]).count(), 1);
+    }
+
+    #[test]
+    fn query_point_finds_exact_match() {
+        let idx = WorldIndex::from_placements(vec![p(1, 100.0, 100.0), p(2, 200.0, 200.0)]);
+        let hits: Vec<i64> = idx.query_point([100.0, 100.0]).map(|pl| pl.actor_id).collect();
+        assert_eq!(hits, vec![1]);
+    }
+
+    #[test]
+    fn query_point_returns_all_coincident_placements() {
+        // Two actors stacked at the same (x, y) — picking should see both.
+        let placements = vec![
+            p(1, 50.0, 50.0),
+            p(2, 50.0, 50.0),
+            p(3, 51.0, 50.0),
+        ];
+        let idx = WorldIndex::from_placements(placements);
+        let mut hits: Vec<i64> =
+            idx.query_point([50.0, 50.0]).map(|pl| pl.actor_id).collect();
+        hits.sort_unstable();
+        assert_eq!(hits, vec![1, 2]);
+    }
+
+    #[test]
+    fn query_point_misses_when_no_placement_at_point() {
+        let idx = WorldIndex::from_placements(vec![p(1, 0.0, 0.0)]);
+        assert!(idx.query_point([10.0, 10.0]).next().is_none());
     }
 }
