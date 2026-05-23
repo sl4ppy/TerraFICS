@@ -1,4 +1,13 @@
-*.sav filter=lfs diff=lfs merge=lfs -text
-* text=auto eol=lf
+# Git LFS — large save-file fixtures (>= 100 MB) live in LFS to keep the main
+# repo lean. Files under tests/corpus/large/ are routed to LFS; small canonical
+# fixtures (like CREATIVE TEST.sav at 1.35 MB) stay in regular Git.
+
+crates/scim-savefile/tests/corpus/large/*.sav filter=lfs diff=lfs merge=lfs -text
+crates/scim-savefile/tests/corpus/large/*.SAV filter=lfs diff=lfs merge=lfs -text
+
+# Line-ending normalization (was: blanket eol=lf; now narrowed to source files
+# so .sav binary fixtures stay byte-identical).
+*.rs   text eol=lf
+*.toml text eol=lf
 *.{cmd,[cC][mM][dD]} text eol=crlf
 *.{bat,[bB][aA][tT]} text eol=crlf
