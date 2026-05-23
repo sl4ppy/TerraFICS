@@ -272,43 +272,62 @@ fn parse_one(path: &Path) -> Result<Outcome, String> {
         );
     }
 
-    // Classify actors via scim-model Registry + decode ConveyorBelt extras (P1.3-c).
+    // Classify + decode via scim-model Registry::decode_for_actor (P1.3-d).
     if header.save_version < 53 {
         if let Ok(env) = scim_savefile::read_body_envelope(&body, &header) {
-            use scim_model::{ClassKind, Component, ConveyorBelt, Registry};
+            use scim_model::{ClassKind, Registry, TypedComponent};
             let registry = Registry::new();
             let mut by_kind: std::collections::HashMap<ClassKind, usize> =
                 std::collections::HashMap::new();
-            let mut belts_decoded = 0_usize;
-            let mut belt_items_total = 0_usize;
+            let mut decoded: std::collections::HashMap<&'static str, usize> =
+                std::collections::HashMap::new();
             for r in scim_savefile::stream_actors(&env, &header) {
                 let Ok(actor) = r else { continue };
                 let kind = registry.classify(&actor.header.class_name);
                 *by_kind.entry(kind).or_default() += 1;
-                if matches!(kind, ClassKind::ConveyorBelt | ClassKind::ConveyorLift) {
-                    let level_save_version = env
-                        .levels
-                        .iter()
-                        .find(|l| l.name == actor.level_name)
-                        .map_or(header.save_version, |l| l.save_version);
-                    if let Ok(eb) = scim_savefile::parse_entity_body(
-                        &actor,
-                        level_save_version,
-                        1000,
-                        &header.map_name,
-                    ) {
-                        if let Ok(belt) = ConveyorBelt::decode(&actor, &eb) {
-                            belts_decoded += 1;
-                            belt_items_total += belt.items.len();
-                        }
-                    }
+                if kind == ClassKind::Unknown {
+                    continue;
+                }
+                let level_save_version = env
+                    .levels
+                    .iter()
+                    .find(|l| l.name == actor.level_name)
+                    .map_or(header.save_version, |l| l.save_version);
+                let Ok(eb) = scim_savefile::parse_entity_body(
+                    &actor,
+                    level_save_version,
+                    1000,
+                    &header.map_name,
+                ) else {
+                    continue;
+                };
+                if let Ok(Some(typed)) = registry.decode_for_actor(&actor, &eb) {
+                    let variant = match typed {
+                        TypedComponent::ConveyorBelt(_) => "ConveyorBelt",
+                        TypedComponent::ConveyorChainActor(_) => "ConveyorChainActor",
+                        TypedComponent::Splitter(_) => "Splitter",
+                        TypedComponent::Miner(_) => "Miner",
+                        TypedComponent::Pipeline(_) => "Pipeline",
+                        TypedComponent::ResourceNode(_) => "ResourceNode",
+                    };
+                    *decoded.entry(variant).or_default() += 1;
                 }
             }
-            let belt_total = by_kind.get(&ClassKind::ConveyorBelt).copied().unwrap_or(0)
-                + by_kind.get(&ClassKind::ConveyorLift).copied().unwrap_or(0);
+            let mut classified_known = 0_usize;
+            for (k, c) in &by_kind {
+                if *k != ClassKind::Unknown {
+                    classified_known += c;
+                }
+            }
+            let total_decoded: usize = decoded.values().sum();
             eprintln!(
-                "      classify: {belt_total} belt/lift actors ({belts_decoded} decoded, {belt_items_total} items)"
+                "      typed: {classified_known} known-kind actors, {total_decoded} decoded into typed components"
             );
+            let mut dec_sorted: Vec<_> = decoded.iter().collect();
+            dec_sorted.sort_by(|a, b| b.1.cmp(a.1));
+            for (v, c) in dec_sorted {
+                eprintln!("        {v}: {c}");
+            }
         }
     }
 
