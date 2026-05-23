@@ -21,5 +21,6 @@ pub use registry::Registry;
 pub mod components;
 pub use components::{
     ChainActorItem, ChainedConveyor, ConveyorBelt, ConveyorBeltItem, ConveyorChainActor, Miner,
-    MinerTier, Pipeline, PipelineKind, SplinePoint, Splitter, SplitterKind,
+    MinerTier, Pipeline, PipelineKind, ResourceNode, ResourceNodeKind, SplinePoint, Splitter,
+    SplitterKind,
 };

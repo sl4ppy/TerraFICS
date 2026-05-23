@@ -10,3 +10,5 @@ pub mod miner;
 pub use miner::{Miner, MinerTier};
 pub mod pipeline;
 pub use pipeline::{Pipeline, PipelineKind};
+pub mod resource_node;
+pub use resource_node::{ResourceNode, ResourceNodeKind};
