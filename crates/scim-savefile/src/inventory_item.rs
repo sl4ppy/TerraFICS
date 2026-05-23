@@ -64,18 +64,23 @@ pub fn read_inventory_item(
 
     let item_state = read_object_property(r, map_name)?;
 
-    let state_body = if item_state.path_name
-        == "/Script/FicsItNetworksComputer.FINItemStateFileSystem"
-    {
-        let hex_length = r.read_i32()?;
-        let hex_length_usize = usize::try_from(hex_length.max(0)).unwrap_or(0);
-        let bytes = r.read_hex(hex_length_usize)?;
-        InventoryItemStateBody::FinFileSystem(bytes)
-    } else {
-        let _properties_length = r.read_i32()?;
-        let bag = read_properties(r, save_version, ue5_version, map_name, Some("InventoryItem"))?;
-        InventoryItemStateBody::Properties(bag.properties)
-    };
+    let state_body =
+        if item_state.path_name == "/Script/FicsItNetworksComputer.FINItemStateFileSystem" {
+            let hex_length = r.read_i32()?;
+            let hex_length_usize = usize::try_from(hex_length.max(0)).unwrap_or(0);
+            let bytes = r.read_hex(hex_length_usize)?;
+            InventoryItemStateBody::FinFileSystem(bytes)
+        } else {
+            let _properties_length = r.read_i32()?;
+            let bag = read_properties(
+                r,
+                save_version,
+                ue5_version,
+                map_name,
+                Some("InventoryItem"),
+            )?;
+            InventoryItemStateBody::Properties(bag.properties)
+        };
 
     Ok(InventoryItem {
         item_name,

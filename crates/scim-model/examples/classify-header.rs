@@ -47,8 +47,7 @@ fn main() -> ExitCode {
     };
 
     let registry = Registry::new();
-    let mut by_kind: std::collections::HashMap<ClassKind, usize> =
-        std::collections::HashMap::new();
+    let mut by_kind: std::collections::HashMap<ClassKind, usize> = std::collections::HashMap::new();
     for r in stream_actors(&env, &h) {
         let Ok(actor) = r else { continue };
         let kind = registry.classify(&actor.header.class_name);

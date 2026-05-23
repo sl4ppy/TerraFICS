@@ -12,7 +12,7 @@ serde                 = { workspace = true, features = ["derive"] }
 miniz_oxide.workspace = true
 
 [dev-dependencies]
-scim-model = { path = "../scim-model" }
+scim-model = { path = "../scim-model", version = "0.1.0" }
 
 [lints]
 workspace = true
