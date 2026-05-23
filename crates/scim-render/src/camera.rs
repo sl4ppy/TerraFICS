@@ -88,6 +88,24 @@ impl Camera2d {
         ]
     }
 
+    /// World-space AABB `[min_x, min_y, max_x, max_y]` of the current
+    /// viewport. Computed from `center`, `viewport`, and `units_per_pixel`.
+    #[must_use]
+    pub fn world_aabb(&self) -> [f32; 4] {
+        // reason: viewport dimensions are window pixel counts; well below 2^24.
+        #[allow(clippy::cast_precision_loss)]
+        let half_w = self.viewport[0] as f32 * 0.5 * self.units_per_pixel;
+        // reason: viewport dimensions are window pixel counts; well below 2^24.
+        #[allow(clippy::cast_precision_loss)]
+        let half_h = self.viewport[1] as f32 * 0.5 * self.units_per_pixel;
+        [
+            self.center[0] - half_w,
+            self.center[1] - half_h,
+            self.center[0] + half_w,
+            self.center[1] + half_h,
+        ]
+    }
+
     /// View-projection matrix (column-major 4x4) for uploading to a wgpu
     /// uniform buffer. Maps world (x, y, z) -> clip space.
     #[must_use]
@@ -164,6 +182,16 @@ mod tests {
         let world_after = cam.world_from_screen(anchor_screen);
         assert!(approx_eq(world_before[0], world_after[0], 1e-3));
         assert!(approx_eq(world_before[1], world_after[1], 1e-3));
+    }
+
+    #[test]
+    fn world_aabb_centered_at_origin_with_unit_upp() {
+        let cam = Camera2d::with_params([0.0, 0.0], 1.0, [200, 100]);
+        let aabb = cam.world_aabb();
+        assert!(approx_eq(aabb[0], -100.0, 1e-4));
+        assert!(approx_eq(aabb[1], -50.0, 1e-4));
+        assert!(approx_eq(aabb[2], 100.0, 1e-4));
+        assert!(approx_eq(aabb[3], 50.0, 1e-4));
     }
 
     #[test]

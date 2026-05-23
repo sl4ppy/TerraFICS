@@ -50,8 +50,8 @@ fn vs_main(in: VsIn, @builtin(instance_index) instance_idx: u32) -> VsOut {
 
 @fragment
 fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
-    let base = vec4<f32>(0.78, 0.78, 0.82, 1.0);
-    let tint = vec4<f32>(1.0, 0.78, 0.20, 1.0); // yellow-orange selection highlight
+    let base = vec4<f32>(0.78, 0.78, 0.82, 0.65);
+    let tint = vec4<f32>(1.0, 0.78, 0.20, 0.85); // yellow-orange selection highlight
     if ((in.flags & FLAG_SELECTED) != 0u) {
         return tint;
     }

@@ -1,5 +1,6 @@
 //! `wgpu` renderer for the P1.5-b instanced footprint pass.
 
+use std::path::PathBuf;
 use std::sync::Arc;
 
 use bytemuck::{Pod, Zeroable};
@@ -12,6 +13,7 @@ use crate::camera::Camera2d;
 use crate::error::{Error, Result};
 use crate::instance::Instance;
 use crate::picking::PickPass;
+use crate::tiles::TilePass;
 use crate::ActorId;
 
 /// Maximum instance count the renderer pre-allocates. 200k is comfortably
@@ -59,6 +61,17 @@ pub struct Renderer {
     camera_uniform_buffer: wgpu::Buffer,
     camera_bind_group: wgpu::BindGroup,
     pick_pass: PickPass,
+    tile_pass: Option<TilePass>,
+    surface_format: wgpu::TextureFormat,
+    // reason: prefix matches existing camera_* fields; visual grouping of camera state
+    #[allow(clippy::struct_field_names)]
+    camera_bgl: wgpu::BindGroupLayout,
+    // reason: prefix matches existing camera_* fields; visual grouping of camera state
+    #[allow(clippy::struct_field_names)]
+    camera_units_per_pixel: f32,
+    // reason: prefix matches existing camera_* fields; visual grouping of camera state
+    #[allow(clippy::struct_field_names)]
+    camera_world_aabb: [f32; 4],
 }
 
 #[allow(clippy::too_many_lines)] // wgpu setup is inherently long; refactor when fragmenting into sub-functions makes the code clearer.
@@ -213,7 +226,7 @@ impl Renderer {
                 entry_point: "fs_main",
                 targets: &[Some(wgpu::ColorTargetState {
                     format: surface_format,
-                    blend: Some(wgpu::BlendState::REPLACE),
+                    blend: Some(wgpu::BlendState::ALPHA_BLENDING),
                     write_mask: wgpu::ColorWrites::ALL,
                 })],
                 compilation_options: wgpu::PipelineCompilationOptions::default(),
@@ -258,6 +271,11 @@ impl Renderer {
             camera_uniform_buffer,
             camera_bind_group,
             pick_pass,
+            tile_pass: None,
+            surface_format,
+            camera_bgl: camera_bind_group_layout,
+            camera_units_per_pixel: 1.0,
+            camera_world_aabb: [0.0, 0.0, 0.0, 0.0],
         })
     }
 
@@ -296,12 +314,15 @@ impl Renderer {
     }
 
     /// Update the camera uniform from a `Camera2d`. 64 B write.
+    /// Also caches `units_per_pixel` and `world_aabb` for the tile pass.
     pub fn set_camera(&mut self, camera: &Camera2d) {
         let uniform = CameraUniform {
             view_proj: camera.view_proj(),
         };
         self.queue
             .write_buffer(&self.camera_uniform_buffer, 0, bytemuck::bytes_of(&uniform));
+        self.camera_units_per_pixel = camera.units_per_pixel();
+        self.camera_world_aabb = camera.world_aabb();
     }
 
     /// Pick the actor under `screen_xy` (window-pixel coordinates;
@@ -460,6 +481,23 @@ impl Renderer {
         self.selection
     }
 
+    /// Set the root directory containing tile pyramid PNGs laid out as
+    /// `{root}/{z}/{x}/{y}.png`. `None` disables tiles entirely; the
+    /// renderer keeps working with the existing dark background under
+    /// footprints. Safe to call mid-session.
+    pub fn set_tile_root(&mut self, root: Option<PathBuf>) {
+        // Drop the old pass (closes the loader channel, joins the worker).
+        self.tile_pass = None;
+        if let Some(root) = root {
+            self.tile_pass = Some(TilePass::new(
+                &self.device,
+                &self.camera_bgl,
+                self.surface_format,
+                root,
+            ));
+        }
+    }
+
     /// Linear scan over the actor-id sidecar. For the P1.5-c instance
     /// counts (< 200k) this is negligible; revisit if hover / multi-select
     /// stress it.
@@ -499,6 +537,21 @@ impl Renderer {
         let view = frame
             .texture
             .create_view(&wgpu::TextureViewDescriptor::default());
+
+        // Drive the tile pass cache + loader BEFORE encoder construction
+        // so create_resident_tile can use &queue freely.
+        let visible_tiles: Vec<crate::tiles::coord::TileKey> =
+            if let Some(tp) = self.tile_pass.as_mut() {
+                tp.update(
+                    &self.device,
+                    &self.queue,
+                    self.camera_units_per_pixel,
+                    self.camera_world_aabb,
+                )
+            } else {
+                Vec::new()
+            };
+
         let mut encoder = self
             .device
             .create_command_encoder(&wgpu::CommandEncoderDescriptor {
@@ -507,7 +560,7 @@ impl Renderer {
 
         {
             let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                label: Some("scim-render footprint pass"),
+                label: Some("scim-render combined pass"),
                 color_attachments: &[Some(wgpu::RenderPassColorAttachment {
                     view: &view,
                     resolve_target: None,
@@ -525,6 +578,13 @@ impl Renderer {
                 timestamp_writes: None,
                 occlusion_query_set: None,
             });
+
+            // Tile pass (under footprints).
+            if let Some(tp) = self.tile_pass.as_ref() {
+                tp.encode(&mut pass, &self.camera_bind_group, &visible_tiles);
+            }
+
+            // Footprint pass.
             pass.set_pipeline(&self.pipeline);
             pass.set_bind_group(0, &self.camera_bind_group, &[]);
             pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
