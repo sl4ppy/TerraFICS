@@ -26,3 +26,5 @@ pub mod blob;
 pub use blob::{insert_blob_if_absent, read_blob, BlobHash};
 pub mod actor;
 pub use actor::{decode_transform, encode_transform, insert_actor, list_actors_in_snapshot, ActorRow};
+pub mod snapshot;
+pub use snapshot::{add_actor_to_snapshot, create_snapshot, list_snapshots, SnapshotRow};
