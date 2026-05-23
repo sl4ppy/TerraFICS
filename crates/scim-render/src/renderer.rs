@@ -386,7 +386,11 @@ impl Renderer {
                     rows_per_image: Some(1),
                 },
             },
-            wgpu::Extent3d { width: 1, height: 1, depth_or_array_layers: 1 },
+            wgpu::Extent3d {
+                width: 1,
+                height: 1,
+                depth_or_array_layers: 1,
+            },
         );
 
         self.queue.submit(std::iter::once(encoder.finish()));
@@ -394,7 +398,8 @@ impl Renderer {
         // ----- block on the readback -----
         let staging = self.pick_pass.staging();
         let slice = staging.slice(..u64::from(crate::picking::PICK_BYTES_PER_ROW));
-        let (tx, rx) = std::sync::mpsc::channel::<std::result::Result<(), wgpu::BufferAsyncError>>();
+        let (tx, rx) =
+            std::sync::mpsc::channel::<std::result::Result<(), wgpu::BufferAsyncError>>();
         slice.map_async(wgpu::MapMode::Read, move |res| {
             // Channel send can only fail if the receiver was dropped; ignore.
             let _ = tx.send(res);
@@ -466,15 +471,17 @@ impl Renderer {
     /// Offset within an Instance is 12 (after `position: [f32; 3]`); see
     /// `selection_tests::flag_offset_within_instance_is_12`.
     fn write_flags(&self, instance_index: usize, flags: u32) {
-        let instance_stride = u64::try_from(std::mem::size_of::<Instance>())
-            .expect("Instance stride fits in u64");
+        let instance_stride =
+            u64::try_from(std::mem::size_of::<Instance>()).expect("Instance stride fits in u64");
         let flag_offset_within_instance: u64 = 12;
-        let buffer_offset = u64::try_from(instance_index)
-            .expect("instance_index fits in u64")
+        let buffer_offset = u64::try_from(instance_index).expect("instance_index fits in u64")
             * instance_stride
             + flag_offset_within_instance;
-        self.queue
-            .write_buffer(&self.instance_buffer, buffer_offset, bytemuck::bytes_of(&flags));
+        self.queue.write_buffer(
+            &self.instance_buffer,
+            buffer_offset,
+            bytemuck::bytes_of(&flags),
+        );
     }
 
     /// Render one frame.

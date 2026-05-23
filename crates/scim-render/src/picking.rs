@@ -103,7 +103,14 @@ impl PickPass {
             cache: None,
         });
 
-        Self { texture, view, staging, pipeline, width, height }
+        Self {
+            texture,
+            view,
+            staging,
+            pipeline,
+            width,
+            height,
+        }
     }
 
     /// Resize the pick texture in lockstep with the surface. Called from
