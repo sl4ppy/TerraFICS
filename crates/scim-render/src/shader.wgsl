@@ -26,12 +26,15 @@ struct VsIn {
 
 struct VsOut {
     @builtin(position) clip: vec4<f32>,
+    @location(0) @interpolate(flat) flags: u32,
+    @location(1) @interpolate(flat) handle: u32,
 };
 
 const QUAD_HALF_EXTENT_WORLD: f32 = 50.0; // 100 unit square (±50)
+const FLAG_SELECTED: u32 = 1u;
 
 @vertex
-fn vs_main(in: VsIn) -> VsOut {
+fn vs_main(in: VsIn, @builtin(instance_index) instance_idx: u32) -> VsOut {
     let world = vec4<f32>(
         in.instance_pos.x + in.quad_pos.x * QUAD_HALF_EXTENT_WORLD * 2.0,
         in.instance_pos.y + in.quad_pos.y * QUAD_HALF_EXTENT_WORLD * 2.0,
@@ -40,11 +43,17 @@ fn vs_main(in: VsIn) -> VsOut {
     );
     var out: VsOut;
     out.clip = camera.view_proj * world;
+    out.flags = in.flags;
+    out.handle = instance_idx + 1u; // 1-based; 0 reserved for "no hit" in the pick pass
     return out;
 }
 
 @fragment
-fn fs_main(_in: VsOut) -> @location(0) vec4<f32> {
-    // Light gray — placeholder until P1.5-f's palette UBO lands.
-    return vec4<f32>(0.78, 0.78, 0.82, 1.0);
+fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
+    let base = vec4<f32>(0.78, 0.78, 0.82, 1.0);
+    let tint = vec4<f32>(1.0, 0.78, 0.20, 1.0); // yellow-orange selection highlight
+    if ((in.flags & FLAG_SELECTED) != 0u) {
+        return tint;
+    }
+    return base;
 }
