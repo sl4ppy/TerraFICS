@@ -33,6 +33,18 @@ impl WorldIndex {
     pub fn is_empty(&self) -> bool {
         self.tree.size() == 0
     }
+
+    /// Iterate placements whose `(x, y)` falls within `[min, max]` (inclusive
+    /// on both bounds — per `rstar` semantics). Returns references into the
+    /// tree; clone if you need owned values.
+    pub fn query_aabb(
+        &self,
+        min: [f32; 2],
+        max: [f32; 2],
+    ) -> impl Iterator<Item = &ActorPlacement> {
+        let env = rstar::AABB::from_corners(min, max);
+        self.tree.locate_in_envelope(&env)
+    }
 }
 
 #[cfg(test)]
@@ -56,5 +68,35 @@ mod tests {
         let idx = WorldIndex::from_placements(placements);
         assert_eq!(idx.len(), 3);
         assert!(!idx.is_empty());
+    }
+
+    #[test]
+    fn query_aabb_returns_only_placements_inside() {
+        let placements = vec![
+            p(1, 0.0, 0.0),
+            p(2, 50.0, 50.0),
+            p(3, 200.0, 200.0),
+            p(4, -300.0, -300.0),
+        ];
+        let idx = WorldIndex::from_placements(placements);
+        let mut hits: Vec<i64> = idx
+            .query_aabb([-10.0, -10.0], [100.0, 100.0])
+            .map(|pl| pl.actor_id)
+            .collect();
+        hits.sort_unstable();
+        assert_eq!(hits, vec![1, 2]);
+    }
+
+    #[test]
+    fn query_aabb_empty_when_outside() {
+        let idx = WorldIndex::from_placements(vec![p(1, 0.0, 0.0)]);
+        assert!(idx.query_aabb([100.0, 100.0], [200.0, 200.0]).next().is_none());
+    }
+
+    #[test]
+    fn query_aabb_inclusive_on_boundary() {
+        // rstar's AABB envelopes are inclusive on both bounds.
+        let idx = WorldIndex::from_placements(vec![p(1, 100.0, 100.0)]);
+        assert_eq!(idx.query_aabb([100.0, 100.0], [100.0, 100.0]).count(), 1);
     }
 }
