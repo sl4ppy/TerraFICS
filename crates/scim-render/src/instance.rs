@@ -47,7 +47,7 @@ pub fn build_instances(index: &WorldIndex) -> Vec<Instance> {
 }
 
 #[cfg(test)]
-// reason: comparisons are bit-for-bit copies through bytemuck — no arithmetic involved.
+// reason: position arrays are bit-for-bit identical through bytemuck round-trips and Vec sorts — no arithmetic involved.
 #[allow(clippy::float_cmp)]
 mod tests {
     use super::*;
