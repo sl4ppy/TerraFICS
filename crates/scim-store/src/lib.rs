@@ -18,3 +18,5 @@ pub mod error;
 pub use error::{Error, Result};
 pub mod schema;
 pub use schema::apply_schema;
+pub mod tuning;
+pub use tuning::apply_tuning;
