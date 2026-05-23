@@ -126,9 +126,11 @@ mod tests {
     }
 
     fn mat_eq(a: &[[f32; 4]; 4], b: &[[f32; 4]; 4]) -> bool {
-        a.iter()
-            .zip(b.iter())
-            .all(|(ra, rb)| ra.iter().zip(rb.iter()).all(|(x, y)| approx_eq(*x, *y, 1e-4)))
+        a.iter().zip(b.iter()).all(|(ra, rb)| {
+            ra.iter()
+                .zip(rb.iter())
+                .all(|(x, y)| approx_eq(*x, *y, 1e-4))
+        })
     }
 
     #[test]

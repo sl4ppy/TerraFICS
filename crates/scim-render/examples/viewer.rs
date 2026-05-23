@@ -71,8 +71,8 @@ impl ApplicationHandler for App {
         let db_path = dir.path().join("viewer.scimdb");
         let mut db = Db::open(&db_path).expect("open db");
         let summary = import_save(&mut db, &self.save_path, "viewer").expect("import_save");
-        let world = WorldIndex::from_snapshot(db.conn(), summary.snapshot_id)
-            .expect("from_snapshot");
+        let world =
+            WorldIndex::from_snapshot(db.conn(), summary.snapshot_id).expect("from_snapshot");
         eprintln!(
             "loaded {} ({} actors, {} indexed placements)",
             self.save_path.display(),
@@ -80,15 +80,11 @@ impl ApplicationHandler for App {
             world.len()
         );
 
-        let renderer =
-            pollster::block_on(Renderer::new(window.clone())).expect("Renderer::new");
+        let renderer = pollster::block_on(Renderer::new(window.clone())).expect("Renderer::new");
 
         let size = window.inner_size();
-        let camera = Camera2d::with_params(
-            [0.0, 0.0],
-            200.0,
-            [size.width.max(1), size.height.max(1)],
-        );
+        let camera =
+            Camera2d::with_params([0.0, 0.0], 200.0, [size.width.max(1), size.height.max(1)]);
 
         let instances = build_instances(&world);
         eprintln!("uploading {} instances", instances.len());
@@ -112,13 +108,10 @@ impl ApplicationHandler for App {
     }
 
     #[allow(clippy::too_many_lines)] // straightforward event-loop match; refactor when handlers grow.
-    fn window_event(
-        &mut self,
-        event_loop: &ActiveEventLoop,
-        _id: WindowId,
-        event: WindowEvent,
-    ) {
-        let Some(state) = self.state.as_mut() else { return };
+    fn window_event(&mut self, event_loop: &ActiveEventLoop, _id: WindowId, event: WindowEvent) {
+        let Some(state) = self.state.as_mut() else {
+            return;
+        };
 
         match event {
             WindowEvent::CloseRequested => event_loop.exit(),
@@ -158,7 +151,11 @@ impl ApplicationHandler for App {
                     state.window.request_redraw();
                 }
             }
-            WindowEvent::MouseInput { state: bstate, button, .. } => {
+            WindowEvent::MouseInput {
+                state: bstate,
+                button,
+                ..
+            } => {
                 if button == MouseButton::Right {
                     match bstate {
                         ElementState::Pressed => {
@@ -200,6 +197,9 @@ fn main() {
         .map_or_else(default_save_path, PathBuf::from);
     let event_loop = EventLoop::new().expect("EventLoop::new");
     event_loop.set_control_flow(winit::event_loop::ControlFlow::Wait);
-    let mut app = App { save_path, state: None };
+    let mut app = App {
+        save_path,
+        state: None,
+    };
     event_loop.run_app(&mut app).expect("run_app");
 }

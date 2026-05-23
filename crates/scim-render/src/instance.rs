@@ -19,7 +19,8 @@ pub struct Instance {
     /// World-space translation `(x, y, z)` from the actor's transform.
     pub position: [f32; 3],
     /// Padding to round the struct out to a vec4. Always 0.
-    #[allow(clippy::pub_underscore_fields)] // Intentional padding field; underscore name signals it is reserved, not a typo.
+    // Intentional padding field; underscore name signals it is reserved, not a typo.
+    #[allow(clippy::pub_underscore_fields)]
     pub _pad: f32,
 }
 
@@ -59,7 +60,10 @@ mod tests {
 
     #[test]
     fn instance_round_trips_through_bytemuck_cast() {
-        let original = Instance { position: [100.0, -200.0, 50.0], _pad: 0.0 };
+        let original = Instance {
+            position: [100.0, -200.0, 50.0],
+            _pad: 0.0,
+        };
         let bytes = bytemuck::bytes_of(&original);
         assert_eq!(bytes.len(), 16);
         let restored: &Instance = bytemuck::from_bytes(bytes);
@@ -70,8 +74,14 @@ mod tests {
     #[test]
     fn instance_slice_casts_to_bytes_for_gpu_upload() {
         let instances = vec![
-            Instance { position: [0.0, 0.0, 0.0], _pad: 0.0 },
-            Instance { position: [100.0, 100.0, 0.0], _pad: 0.0 },
+            Instance {
+                position: [0.0, 0.0, 0.0],
+                _pad: 0.0,
+            },
+            Instance {
+                position: [100.0, 100.0, 0.0],
+                _pad: 0.0,
+            },
         ];
         let bytes = bytemuck::cast_slice::<Instance, u8>(&instances);
         assert_eq!(bytes.len(), 32);
@@ -82,8 +92,14 @@ mod tests {
         use scim_world::{ActorPlacement, WorldIndex};
 
         let placements = vec![
-            ActorPlacement { actor_id: 1, position: [10.0, 20.0, 30.0] },
-            ActorPlacement { actor_id: 2, position: [-5.0, 0.0, 0.0] },
+            ActorPlacement {
+                actor_id: 1,
+                position: [10.0, 20.0, 30.0],
+            },
+            ActorPlacement {
+                actor_id: 2,
+                position: [-5.0, 0.0, 0.0],
+            },
         ];
         let idx = WorldIndex::from_placements(placements);
 

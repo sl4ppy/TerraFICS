@@ -24,9 +24,9 @@ struct QuadVertex {
 
 const QUAD_VERTICES: &[QuadVertex] = &[
     QuadVertex { pos: [-0.5, -0.5] },
-    QuadVertex { pos: [ 0.5, -0.5] },
-    QuadVertex { pos: [-0.5,  0.5] },
-    QuadVertex { pos: [ 0.5,  0.5] },
+    QuadVertex { pos: [0.5, -0.5] },
+    QuadVertex { pos: [-0.5, 0.5] },
+    QuadVertex { pos: [0.5, 0.5] },
 ];
 const QUAD_INDICES: &[u16] = &[0, 1, 2, 2, 1, 3];
 
@@ -84,7 +84,7 @@ impl Renderer {
                 &wgpu::DeviceDescriptor {
                     label: Some("scim-render device"),
                     required_features: wgpu::Features::empty(),
-                    required_limits: wgpu::Limits::downlevel_defaults(),
+                    required_limits: wgpu::Limits::default(),
                     memory_hints: wgpu::MemoryHints::default(),
                 },
                 None,
@@ -130,13 +130,14 @@ impl Renderer {
             mapped_at_creation: false,
         });
 
-        let camera_uniform = CameraUniform { view_proj: [[0.0; 4]; 4] };
-        let camera_uniform_buffer =
-            device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                label: Some("scim-render camera uniform buffer"),
-                contents: bytemuck::bytes_of(&camera_uniform),
-                usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-            });
+        let camera_uniform = CameraUniform {
+            view_proj: [[0.0; 4]; 4],
+        };
+        let camera_uniform_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("scim-render camera uniform buffer"),
+            contents: bytemuck::bytes_of(&camera_uniform),
+            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+        });
 
         let camera_bind_group_layout =
             device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
@@ -174,8 +175,8 @@ impl Renderer {
 
         let quad_stride = u64::try_from(std::mem::size_of::<QuadVertex>())
             .expect("QuadVertex stride fits in u64");
-        let instance_stride = u64::try_from(std::mem::size_of::<Instance>())
-            .expect("Instance stride fits in u64");
+        let instance_stride =
+            u64::try_from(std::mem::size_of::<Instance>()).expect("Instance stride fits in u64");
 
         let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
             label: Some("scim-render footprint pipeline"),
@@ -262,7 +263,9 @@ impl Renderer {
 
     /// Update the camera uniform from a `Camera2d`. 64 B write.
     pub fn set_camera(&mut self, camera: &Camera2d) {
-        let uniform = CameraUniform { view_proj: camera.view_proj() };
+        let uniform = CameraUniform {
+            view_proj: camera.view_proj(),
+        };
         self.queue
             .write_buffer(&self.camera_uniform_buffer, 0, bytemuck::bytes_of(&uniform));
     }
@@ -313,8 +316,7 @@ impl Renderer {
             pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
             pass.set_vertex_buffer(1, self.instance_buffer.slice(..));
             pass.set_index_buffer(self.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
-            let index_count =
-                u32::try_from(QUAD_INDICES.len()).expect("6 indices fit u32");
+            let index_count = u32::try_from(QUAD_INDICES.len()).expect("6 indices fit u32");
             pass.draw_indexed(0..index_count, 0, 0..self.instance_count);
         }
 

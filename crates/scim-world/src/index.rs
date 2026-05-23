@@ -177,11 +177,7 @@ mod tests {
 
     #[test]
     fn world_index_iter_visits_every_placement() {
-        let placements = vec![
-            p(1, 0.0, 0.0),
-            p(2, 100.0, 200.0),
-            p(3, -50.0, 50.0),
-        ];
+        let placements = vec![p(1, 0.0, 0.0), p(2, 100.0, 200.0), p(3, -50.0, 50.0)];
         let idx = WorldIndex::from_placements(placements);
         let mut seen: Vec<i64> = idx.iter().map(|pl| pl.actor_id).collect();
         seen.sort_unstable();
