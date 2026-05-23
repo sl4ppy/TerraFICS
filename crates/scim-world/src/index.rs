@@ -1,7 +1,7 @@
 //! Read-only spatial index over a `scim-store` snapshot. See spec §6.2.
 
-use rusqlite::Connection;
 use rstar::RTree;
+use rusqlite::Connection;
 
 use crate::error::Result;
 use crate::placement::ActorPlacement;
@@ -29,7 +29,10 @@ impl WorldIndex {
         for row in rows {
             let Some(blob) = row.transform else { continue };
             let (_rot, trans, _scale) = scim_store::decode_transform(&blob)?;
-            placements.push(ActorPlacement { actor_id: row.id, position: trans });
+            placements.push(ActorPlacement {
+                actor_id: row.id,
+                position: trans,
+            });
         }
         Ok(Self::from_placements(placements))
     }
@@ -39,7 +42,9 @@ impl WorldIndex {
     /// better-balanced tree than incremental insertion.
     #[must_use]
     pub fn from_placements(placements: Vec<ActorPlacement>) -> Self {
-        Self { tree: RTree::bulk_load(placements) }
+        Self {
+            tree: RTree::bulk_load(placements),
+        }
     }
 
     /// Number of placements indexed.
@@ -79,7 +84,10 @@ mod tests {
     use super::*;
 
     const fn p(id: i64, x: f32, y: f32) -> ActorPlacement {
-        ActorPlacement { actor_id: id, position: [x, y, 0.0] }
+        ActorPlacement {
+            actor_id: id,
+            position: [x, y, 0.0],
+        }
     }
 
     #[test]
@@ -117,7 +125,10 @@ mod tests {
     #[test]
     fn query_aabb_empty_when_outside() {
         let idx = WorldIndex::from_placements(vec![p(1, 0.0, 0.0)]);
-        assert!(idx.query_aabb([100.0, 100.0], [200.0, 200.0]).next().is_none());
+        assert!(idx
+            .query_aabb([100.0, 100.0], [200.0, 200.0])
+            .next()
+            .is_none());
     }
 
     #[test]
@@ -130,21 +141,22 @@ mod tests {
     #[test]
     fn query_point_finds_exact_match() {
         let idx = WorldIndex::from_placements(vec![p(1, 100.0, 100.0), p(2, 200.0, 200.0)]);
-        let hits: Vec<i64> = idx.query_point([100.0, 100.0]).map(|pl| pl.actor_id).collect();
+        let hits: Vec<i64> = idx
+            .query_point([100.0, 100.0])
+            .map(|pl| pl.actor_id)
+            .collect();
         assert_eq!(hits, vec![1]);
     }
 
     #[test]
     fn query_point_returns_all_coincident_placements() {
         // Two actors stacked at the same (x, y) — picking should see both.
-        let placements = vec![
-            p(1, 50.0, 50.0),
-            p(2, 50.0, 50.0),
-            p(3, 51.0, 50.0),
-        ];
+        let placements = vec![p(1, 50.0, 50.0), p(2, 50.0, 50.0), p(3, 51.0, 50.0)];
         let idx = WorldIndex::from_placements(placements);
-        let mut hits: Vec<i64> =
-            idx.query_point([50.0, 50.0]).map(|pl| pl.actor_id).collect();
+        let mut hits: Vec<i64> = idx
+            .query_point([50.0, 50.0])
+            .map(|pl| pl.actor_id)
+            .collect();
         hits.sort_unstable();
         assert_eq!(hits, vec![1, 2]);
     }
@@ -170,14 +182,12 @@ mod from_snapshot_tests {
     fn from_snapshot_indexes_actors_with_transforms_and_skips_objects() {
         let db = Db::open_in_memory().unwrap();
         let conn = db.conn();
-        let snapshot_id =
-            create_snapshot(conn, None, 0, "test", None, None).unwrap();
+        let snapshot_id = create_snapshot(conn, None, 0, "test", None, None).unwrap();
 
         let hash = insert_blob_if_absent(conn, b"body").unwrap();
 
         // Actor at (100, 200, 50) with transform.
-        let xform =
-            encode_transform([0.0, 0.0, 0.0, 1.0], [100.0, 200.0, 50.0], [1.0, 1.0, 1.0]);
+        let xform = encode_transform([0.0, 0.0, 0.0, 1.0], [100.0, 200.0, 50.0], [1.0, 1.0, 1.0]);
         let a1 = insert_actor(
             conn,
             "Persistent.A1",
@@ -190,8 +200,7 @@ mod from_snapshot_tests {
         add_actor_to_snapshot(conn, snapshot_id, a1).unwrap();
 
         // Actor at (-50, 0, 0).
-        let xform2 =
-            encode_transform([0.0, 0.0, 0.0, 1.0], [-50.0, 0.0, 0.0], [1.0, 1.0, 1.0]);
+        let xform2 = encode_transform([0.0, 0.0, 0.0, 1.0], [-50.0, 0.0, 0.0], [1.0, 1.0, 1.0]);
         let a2 = insert_actor(
             conn,
             "Persistent.A2",
@@ -218,12 +227,16 @@ mod from_snapshot_tests {
         let idx = WorldIndex::from_snapshot(conn, snapshot_id).unwrap();
         assert_eq!(idx.len(), 2, "object-kind row should be skipped");
 
-        let hits: Vec<i64> =
-            idx.query_aabb([99.0, 199.0], [101.0, 201.0]).map(|p| p.actor_id).collect();
+        let hits: Vec<i64> = idx
+            .query_aabb([99.0, 199.0], [101.0, 201.0])
+            .map(|p| p.actor_id)
+            .collect();
         assert_eq!(hits, vec![a1]);
 
-        let hits2: Vec<i64> =
-            idx.query_aabb([-100.0, -100.0], [0.0, 0.0]).map(|p| p.actor_id).collect();
+        let hits2: Vec<i64> = idx
+            .query_aabb([-100.0, -100.0], [0.0, 0.0])
+            .map(|p| p.actor_id)
+            .collect();
         assert_eq!(hits2, vec![a2]);
     }
 }

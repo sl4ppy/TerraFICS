@@ -33,7 +33,10 @@ mod tests {
 
     #[test]
     fn placement_envelope_is_point_in_xy() {
-        let p = ActorPlacement { actor_id: 7, position: [100.0, -50.0, 12.5] };
+        let p = ActorPlacement {
+            actor_id: 7,
+            position: [100.0, -50.0, 12.5],
+        };
         let env: AABB<[f32; 2]> = p.envelope();
         // For a point envelope, lower == upper == (x, y); z is ignored.
         assert_eq!(env.lower(), [100.0, -50.0]);
@@ -42,8 +45,14 @@ mod tests {
 
     #[test]
     fn placement_envelope_ignores_z() {
-        let a = ActorPlacement { actor_id: 1, position: [0.0, 0.0, 999.0] };
-        let b = ActorPlacement { actor_id: 2, position: [0.0, 0.0, -999.0] };
+        let a = ActorPlacement {
+            actor_id: 1,
+            position: [0.0, 0.0, 999.0],
+        };
+        let b = ActorPlacement {
+            actor_id: 2,
+            position: [0.0, 0.0, -999.0],
+        };
         assert_eq!(a.envelope(), b.envelope());
     }
 }

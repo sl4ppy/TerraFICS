@@ -20,8 +20,7 @@ fn setup_db() -> (tempfile::TempDir, Db, i64) {
     let dir = tempfile::tempdir().expect("tempdir");
     let path = dir.path().join("bench.scimdb");
     let mut db = Db::open(&path).expect("open db");
-    let summary = import_save(&mut db, corpus_path("CREATIVE TEST.sav"), "bench")
-        .expect("import");
+    let summary = import_save(&mut db, corpus_path("CREATIVE TEST.sav"), "bench").expect("import");
     (dir, db, summary.snapshot_id)
 }
 
@@ -31,8 +30,7 @@ fn bench_from_snapshot(c: &mut Criterion) {
     group.sample_size(20);
     group.bench_function("CREATIVE TEST.sav", |b| {
         b.iter(|| {
-            let idx =
-                WorldIndex::from_snapshot(db.conn(), black_box(snapshot_id)).unwrap();
+            let idx = WorldIndex::from_snapshot(db.conn(), black_box(snapshot_id)).unwrap();
             black_box(idx);
         });
     });
@@ -46,7 +44,10 @@ fn bench_query_aabb(c: &mut Criterion) {
     group.bench_function("viewport_100k", |b| {
         b.iter(|| {
             let hits: usize = idx
-                .query_aabb(black_box([-50_000.0, -50_000.0]), black_box([50_000.0, 50_000.0]))
+                .query_aabb(
+                    black_box([-50_000.0, -50_000.0]),
+                    black_box([50_000.0, 50_000.0]),
+                )
                 .count();
             black_box(hits);
         });

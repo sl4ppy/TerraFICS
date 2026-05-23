@@ -28,8 +28,7 @@ fn from_snapshot_indexes_creative_test_sav() {
     assert_eq!(summary.failed_actors, 0);
 
     let all_rows = list_actors_in_snapshot(db.conn(), summary.snapshot_id).unwrap();
-    let rows_with_transform =
-        all_rows.iter().filter(|r| r.transform.is_some()).count();
+    let rows_with_transform = all_rows.iter().filter(|r| r.transform.is_some()).count();
 
     let t0 = Instant::now();
     let idx = WorldIndex::from_snapshot(db.conn(), summary.snapshot_id).unwrap();
@@ -65,7 +64,8 @@ fn from_snapshot_indexes_creative_test_sav() {
     // A modest AABB around the origin should return some subset, not all.
     assert!(
         idx.query_aabb([-100_000.0, -100_000.0], [100_000.0, 100_000.0])
-            .count() <= idx.len(),
+            .count()
+            <= idx.len(),
         "filtered query cannot exceed full index"
     );
 }
