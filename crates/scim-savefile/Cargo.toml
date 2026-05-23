@@ -13,6 +13,8 @@ miniz_oxide.workspace = true
 
 [dev-dependencies]
 scim-model = { path = "../scim-model", version = "0.1.0" }
+scim-store = { path = "../scim-store", version = "0.1.0" }
+tempfile   = "=3.10.1"
 
 [lints]
 workspace = true

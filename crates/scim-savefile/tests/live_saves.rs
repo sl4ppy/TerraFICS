@@ -331,5 +331,28 @@ fn parse_one(path: &Path) -> Result<Outcome, String> {
         }
     }
 
+    // Import into a temp project DB (P1.4). Validates the full end-to-end pipeline.
+    if header.save_version < 53 {
+        let dir = tempfile::tempdir().map_err(|e| format!("tempdir: {e}"))?;
+        let db_path = dir.path().join("live_saves_import.scimdb");
+        let mut store_db =
+            scim_store::Db::open(&db_path).map_err(|e| format!("open store db: {e}"))?;
+        let label = path
+            .file_name()
+            .map_or_else(|| "unnamed".to_string(), |s| s.to_string_lossy().into_owned());
+        match scim_store::import::import_save(&mut store_db, path, &label) {
+            Ok(summary) => {
+                eprintln!(
+                    "      store: snapshot {}, {} actors, {} unique blobs",
+                    summary.snapshot_id, summary.total_actors, summary.blobs_inserted
+                );
+            }
+            Err(e) => {
+                eprintln!("      store: IMPORT FAILED: {e}");
+                return Err(format!("scim-store import: {e}"));
+            }
+        }
+    }
+
     Ok(Outcome::Parsed)
 }
