@@ -21,6 +21,16 @@ use crate::property::{read_properties, Property, UnsupportedHit};
 use crate::raw_actor::RawActor;
 use crate::reader::Reader;
 
+impl EntityBody<'_> {
+    /// Linear-scan for the first property whose `name` matches. Returns `None`
+    /// if no matching property exists. O(N) in the number of properties; the
+    /// caller is expected to be looking for a small number of well-known names.
+    #[must_use]
+    pub fn find_property(&self, name: &str) -> Option<&crate::property::Property> {
+        self.properties.iter().find(|p| p.name == name)
+    }
+}
+
 #[derive(Debug)]
 pub struct EntityBody<'a> {
     /// Present only for `ObjectKind::Actor` entities. The actor's own reference.
@@ -184,6 +194,37 @@ mod tests {
         assert!(eb.entity_reference.is_none());
         assert!(eb.children.is_empty());
         assert!(eb.properties.is_empty());
+    }
+
+    use crate::property::{Property, PropertyValue};
+
+    #[test]
+    fn find_property_returns_first_match() {
+        let body = EntityBody {
+            entity_reference: None,
+            children: Vec::new(),
+            properties: vec![
+                Property {
+                    name: "mCount".to_string(),
+                    type_name: "Int".to_string(),
+                    index: Some(0),
+                    guid: None,
+                    value: PropertyValue::Int(42),
+                },
+                Property {
+                    name: "mLabel".to_string(),
+                    type_name: "Str".to_string(),
+                    index: Some(0),
+                    guid: None,
+                    value: PropertyValue::Str("hi".to_string()),
+                },
+            ],
+            first_unsupported: None,
+            trailing_bytes: &[],
+        };
+        let found = body.find_property("mLabel").expect("mLabel present");
+        assert_eq!(found.value.as_str(), Some("hi"));
+        assert!(body.find_property("mMissing").is_none());
     }
 
     #[test]

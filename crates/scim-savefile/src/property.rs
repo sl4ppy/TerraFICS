@@ -62,6 +62,76 @@ pub enum PropertyValue {
     Text(crate::property_text::TextValue),
 }
 
+impl PropertyValue {
+    #[must_use]
+    pub const fn as_bool(&self) -> Option<bool> {
+        match self {
+            Self::Bool(b) => Some(*b),
+            _ => None,
+        }
+    }
+
+    #[must_use]
+    pub const fn as_int(&self) -> Option<i32> {
+        match self {
+            Self::Int(v) => Some(*v),
+            _ => None,
+        }
+    }
+
+    #[must_use]
+    pub const fn as_int64(&self) -> Option<i64> {
+        match self {
+            Self::Int64(v) => Some(*v),
+            _ => None,
+        }
+    }
+
+    #[must_use]
+    pub const fn as_float(&self) -> Option<f32> {
+        match self {
+            Self::Float(v) => Some(*v),
+            _ => None,
+        }
+    }
+
+    #[must_use]
+    pub const fn as_double(&self) -> Option<f64> {
+        match self {
+            Self::Double(v) => Some(*v),
+            _ => None,
+        }
+    }
+
+    #[must_use]
+    pub fn as_str(&self) -> Option<&str> {
+        match self {
+            Self::Str(s) | Self::Name(s) => Some(s.as_str()),
+            _ => None,
+        }
+    }
+
+    #[must_use]
+    pub const fn as_object_ref(&self) -> Option<&ObjectProperty> {
+        match self {
+            Self::ObjectRef(o) | Self::InterfaceRef(o) => Some(o),
+            _ => None,
+        }
+    }
+
+    /// Read a Byte property's `EnumNamed` variant value name.
+    /// Returns None for the `NoneValueU8` variant or non-Byte types.
+    #[must_use]
+    pub fn as_byte_enum(&self) -> Option<&str> {
+        match self {
+            Self::Byte(crate::property_enum_byte::ByteValue::EnumNamed { value_name, .. }) => {
+                Some(value_name.as_str())
+            }
+            _ => None,
+        }
+    }
+}
+
 /// Read the next property record from `r`. Returns `Ok(None)` if the next name
 /// string is the literal `"None"` sentinel (end of property bag).
 ///
@@ -530,6 +600,38 @@ mod tests {
         let hit = bag.first_unsupported.expect("expected unsupported hit");
         assert_eq!(hit.property_name, "mList");
         assert_eq!(hit.type_name, "WeirdMod");
+    }
+
+    #[test]
+    fn as_int_extracts_int_value() {
+        assert_eq!(PropertyValue::Int(42).as_int(), Some(42));
+        assert_eq!(PropertyValue::Float(1.0).as_int(), None);
+    }
+
+    #[test]
+    fn as_str_handles_str_and_name() {
+        assert_eq!(
+            PropertyValue::Str("hello".to_string()).as_str(),
+            Some("hello")
+        );
+        assert_eq!(
+            PropertyValue::Name("named".to_string()).as_str(),
+            Some("named")
+        );
+        assert_eq!(PropertyValue::Int(7).as_str(), None);
+    }
+
+    #[test]
+    fn as_object_ref_handles_object_and_interface() {
+        let obj = ObjectProperty {
+            level_name: None,
+            path_name: "Foo".to_string(),
+        };
+        let val = PropertyValue::ObjectRef(obj.clone());
+        assert_eq!(val.as_object_ref().map(|o| o.path_name.as_str()), Some("Foo"));
+        let val2 = PropertyValue::InterfaceRef(obj);
+        assert_eq!(val2.as_object_ref().map(|o| o.path_name.as_str()), Some("Foo"));
+        assert_eq!(PropertyValue::Int(1).as_object_ref(), None);
     }
 
     #[test]
