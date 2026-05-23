@@ -10,6 +10,7 @@ license.workspace      = true
 thiserror.workspace   = true
 serde                 = { workspace = true, features = ["derive"] }
 miniz_oxide.workspace = true
+rayon.workspace       = true
 
 [dev-dependencies]
 scim-model = { path = "../scim-model", version = "0.1.0" }
