@@ -11,6 +11,7 @@ use scim_world::WorldIndex;
 use crate::camera::Camera2d;
 use crate::error::{Error, Result};
 use crate::instance::Instance;
+use crate::picking::PickPass;
 use crate::ActorId;
 
 /// Maximum instance count the renderer pre-allocates. 200k is comfortably
@@ -57,6 +58,7 @@ pub struct Renderer {
     selection: Option<ActorId>,
     camera_uniform_buffer: wgpu::Buffer,
     camera_bind_group: wgpu::BindGroup,
+    pick_pass: PickPass,
 }
 
 #[allow(clippy::too_many_lines)] // wgpu setup is inherently long; refactor when fragmenting into sub-functions makes the code clearer.
@@ -231,6 +233,16 @@ impl Renderer {
             cache: None,
         });
 
+        let pick_pass = PickPass::new(
+            &device,
+            &shader,
+            &camera_bind_group_layout,
+            quad_stride,
+            instance_stride,
+            width,
+            height,
+        );
+
         Ok(Self {
             device,
             queue,
@@ -245,10 +257,12 @@ impl Renderer {
             selection: None,
             camera_uniform_buffer,
             camera_bind_group,
+            pick_pass,
         })
     }
 
-    /// Resize the surface (call from `WindowEvent::Resized`).
+    /// Resize the surface and pick texture in lockstep
+    /// (call from `WindowEvent::Resized`).
     pub fn resize(&mut self, width: u32, height: u32) {
         if width == 0 || height == 0 {
             return;
@@ -256,6 +270,7 @@ impl Renderer {
         self.surface_config.width = width;
         self.surface_config.height = height;
         self.surface.configure(&self.device, &self.surface_config);
+        self.pick_pass.resize(&self.device, width, height);
     }
 
     /// Upload a fresh instance buffer derived from `WorldIndex`. Walks the
@@ -287,6 +302,131 @@ impl Renderer {
         };
         self.queue
             .write_buffer(&self.camera_uniform_buffer, 0, bytemuck::bytes_of(&uniform));
+    }
+
+    /// Pick the actor under `screen_xy` (window-pixel coordinates;
+    /// origin = top-left, +Y = down). Blocks ~1–10 ms on the GPU readback;
+    /// click is rare, so this is acceptable. Returns `None` if the cursor
+    /// is over empty space or off-surface.
+    // reason: GPU command-encoder + readback is inherently sequential; splitting hurts readability
+    #[allow(clippy::too_many_lines)]
+    pub fn pick(&mut self, screen_xy: [f32; 2]) -> Option<ActorId> {
+        if self.instance_count == 0 {
+            return None;
+        }
+        let surface_w = self.surface_config.width;
+        let surface_h = self.surface_config.height;
+        // reason: surface_w/h are window pixel counts well below 2^24; f32 represents them exactly
+        #[allow(clippy::cast_precision_loss)]
+        let x_bound = surface_w.saturating_sub(1) as f32;
+        // reason: surface_w/h are window pixel counts well below 2^24; f32 represents them exactly
+        #[allow(clippy::cast_precision_loss)]
+        let y_bound = surface_h.saturating_sub(1) as f32;
+        // reason: screen_xy[0] is clamped to [0, x_bound] (non-negative, < 2^32) before cast; no truncation or sign loss
+        #[allow(clippy::cast_sign_loss)]
+        #[allow(clippy::cast_possible_truncation)]
+        let cx = screen_xy[0].clamp(0.0, x_bound) as u32;
+        // reason: screen_xy[1] is clamped to [0, y_bound] (non-negative, < 2^32) before cast; no truncation or sign loss
+        #[allow(clippy::cast_sign_loss)]
+        #[allow(clippy::cast_possible_truncation)]
+        let cy = screen_xy[1].clamp(0.0, y_bound) as u32;
+
+        // ----- encode the scissored pick pass -----
+        let mut encoder = self
+            .device
+            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                label: Some("scim-render pick encoder"),
+            });
+        {
+            let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                label: Some("scim-render pick pass"),
+                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                    view: self.pick_pass.view(),
+                    resolve_target: None,
+                    ops: wgpu::Operations {
+                        // Clear to 0 = "no hit" everywhere outside the scissor.
+                        load: wgpu::LoadOp::Clear(wgpu::Color {
+                            r: 0.0,
+                            g: 0.0,
+                            b: 0.0,
+                            a: 0.0,
+                        }),
+                        store: wgpu::StoreOp::Store,
+                    },
+                })],
+                depth_stencil_attachment: None,
+                timestamp_writes: None,
+                occlusion_query_set: None,
+            });
+            pass.set_pipeline(self.pick_pass.pipeline());
+            pass.set_bind_group(0, &self.camera_bind_group, &[]);
+            pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
+            pass.set_vertex_buffer(1, self.instance_buffer.slice(..));
+            pass.set_index_buffer(self.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
+            // Scissor to the 1×1 pixel under the cursor: the rasteriser
+            // only does the work needed to colour that pixel.
+            pass.set_scissor_rect(cx, cy, 1, 1);
+            let index_count = u32::try_from(QUAD_INDICES.len()).expect("6 indices fit u32");
+            pass.draw_indexed(0..index_count, 0, 0..self.instance_count);
+        }
+
+        // ----- copy the single pixel into the staging buffer -----
+        encoder.copy_texture_to_buffer(
+            wgpu::ImageCopyTexture {
+                texture: self.pick_pass.texture(),
+                mip_level: 0,
+                origin: wgpu::Origin3d { x: cx, y: cy, z: 0 },
+                aspect: wgpu::TextureAspect::All,
+            },
+            wgpu::ImageCopyBuffer {
+                buffer: self.pick_pass.staging(),
+                layout: wgpu::ImageDataLayout {
+                    offset: 0,
+                    bytes_per_row: Some(crate::picking::PICK_BYTES_PER_ROW),
+                    rows_per_image: Some(1),
+                },
+            },
+            wgpu::Extent3d { width: 1, height: 1, depth_or_array_layers: 1 },
+        );
+
+        self.queue.submit(std::iter::once(encoder.finish()));
+
+        // ----- block on the readback -----
+        let staging = self.pick_pass.staging();
+        let slice = staging.slice(..u64::from(crate::picking::PICK_BYTES_PER_ROW));
+        let (tx, rx) = std::sync::mpsc::channel::<std::result::Result<(), wgpu::BufferAsyncError>>();
+        slice.map_async(wgpu::MapMode::Read, move |res| {
+            // Channel send can only fail if the receiver was dropped; ignore.
+            let _ = tx.send(res);
+        });
+        // Push the GPU work + map callback through.
+        self.device.poll(wgpu::Maintain::Wait);
+        match rx.recv() {
+            Ok(Ok(())) => {}
+            Ok(Err(_)) | Err(_) => {
+                // Map failed or sender hung up — treat as a miss. Buffer
+                // remains unmapped in this branch which is fine; next
+                // call will map again.
+                return None;
+            }
+        }
+
+        let handle = {
+            let mapped = slice.get_mapped_range();
+            // First 4 bytes are the R32Uint pixel value.
+            let bytes: [u8; 4] = [mapped[0], mapped[1], mapped[2], mapped[3]];
+            u32::from_ne_bytes(bytes)
+        };
+        // Drop the mapped range before unmap (required by wgpu).
+        staging.unmap();
+
+        if handle == 0 {
+            return None;
+        }
+        // Handle is 1-based.
+        // reason: handle is at least 1 (checked above) so subtracting 1 cannot underflow
+        let idx = (handle as usize) - 1;
+        self.actor_ids.get(idx).copied()
     }
 
     /// Set the currently-selected actor (or clear with `None`). Cheap:
