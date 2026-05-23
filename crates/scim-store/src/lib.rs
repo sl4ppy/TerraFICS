@@ -20,3 +20,5 @@ pub mod schema;
 pub use schema::apply_schema;
 pub mod tuning;
 pub use tuning::apply_tuning;
+pub mod db;
+pub use db::Db;
