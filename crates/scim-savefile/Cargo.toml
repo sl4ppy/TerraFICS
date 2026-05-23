@@ -24,3 +24,7 @@ workspace = true
 [[bench]]
 name = "header_bench"
 harness = false
+
+[[bench]]
+name = "body_bench"
+harness = false
