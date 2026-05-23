@@ -16,3 +16,5 @@ pub mod component;
 pub use component::Component;
 pub mod registry;
 pub use registry::Registry;
+pub mod components;
+pub use components::{ConveyorBelt, ConveyorBeltItem};

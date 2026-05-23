@@ -49,6 +49,7 @@ pub mod entity_body;
 pub use entity_body::{parse_entity_body, EntityBody};
 pub mod inventory_item;
 pub use inventory_item::{read_inventory_item, InventoryItem, InventoryItemStateBody};
+pub use reader::Reader;
 pub mod property_array;
 pub mod property_map;
 pub mod property_struct;
