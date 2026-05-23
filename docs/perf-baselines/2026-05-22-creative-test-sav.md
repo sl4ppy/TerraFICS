@@ -57,3 +57,34 @@ Notes:
   realization. At 6.7 µs per viewport query the per-frame cost is well under
   the 60 fps budget (16.7 ms) — the renderer's spatial-cull pass has plenty of
   headroom even at 1 GB+ saves with proportionally more placements.
+
+## P1.5-b — `scim-render` foundation (added 2026-05-23)
+
+First GPU code in the project. The footprint pass draws one instanced unit
+quad per actor placement; no criterion bench (wgpu has no headless story we
+want to invest in for v1). Numbers below are observational from the viewer
+example on the baseline machine.
+
+| Metric | Observation |
+|---|---|
+| Instance buffer build (`build_instances` over 17,974 placements) | < 1 ms — trivial Vec collect |
+| Renderer construction (`Renderer::new` async, includes adapter + device + pipeline) | ~100–300 ms cold (driver init) |
+| Per-frame render (17,974 instanced quads, 1280×800 surface) | 60 FPS locked with v-sync; well under 16.7 ms budget |
+| Cold launch → first frame (`import_save` → `WorldIndex` → upload → render) | ~5–6 s, dominated by `import_save` (~5 s for CREATIVE TEST.sav) |
+
+Notes:
+- The 60 FPS observation is from v-sync-bound rendering. The actual GPU work
+  per frame is negligible (under 1 ms) — measured indirectly by hardware
+  monitor tools, not in-code. Real perf budget validation (spec §6.6: 60 FPS
+  at 1440p with ~1M actors) waits on a larger fixture.
+- `import_save` still dominates cold launch. The spec budget is "Cold load
+  .sav → first interactive frame: < 2 s" at 500 MB. Today's import takes
+  ~5 s on the 1.35 MB CREATIVE TEST.sav; that's an O(n) cost that will
+  dominate any future 500 MB save. P1.2-d perf v2 addresses this — it
+  remains the open perf debt.
+- The renderer does NOT yet implement viewport culling (R-tree
+  `query_aabb` is built and benched in P1.5-a but the renderer uploads ALL
+  placements every frame). With 17,974 instances on a desktop GPU this is
+  fine; at 1M+ it will become necessary. Culling lands when the spec §6.6
+  perf headroom requires it — earliest in P1.5-c (picking shares the
+  query infrastructure), latest if perf bites.
