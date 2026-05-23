@@ -337,7 +337,7 @@ mod tests {
         write_ascii(&mut bytes, "StructProperty");
         bytes.push(0); // padding
         bytes.extend_from_slice(&2_i32.to_le_bytes()); // count = 2
-        // Inner Struct preamble (ue5 < 1011 path):
+                                                       // Inner Struct preamble (ue5 < 1011 path):
         write_ascii(&mut bytes, "mVertexList"); // property_name
         write_ascii(&mut bytes, "StructProperty");
         bytes.extend_from_slice(&48_i32.to_le_bytes()); // structure_size = 2 * 24
@@ -345,7 +345,7 @@ mod tests {
         write_ascii(&mut bytes, "Vector"); // structure_subtype
         bytes.extend_from_slice(&[0_u8; 16]); // struct_sub_guid (zero)
         bytes.push(0); // padding
-        // Element 1
+                       // Element 1
         bytes.extend_from_slice(&1.0_f64.to_le_bytes());
         bytes.extend_from_slice(&2.0_f64.to_le_bytes());
         bytes.extend_from_slice(&3.0_f64.to_le_bytes());

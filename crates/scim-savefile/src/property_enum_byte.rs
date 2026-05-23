@@ -19,7 +19,10 @@ use crate::reader::Reader;
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum ByteValue {
     NoneValueU8(u8),
-    EnumNamed { enum_name: String, value_name: String },
+    EnumNamed {
+        enum_name: String,
+        value_name: String,
+    },
 }
 
 pub fn read_enum_property(

@@ -348,7 +348,9 @@ mod tests {
         write_no_guid(&mut bytes);
         bytes.extend_from_slice(&42_i32.to_le_bytes());
         let mut r = Reader::new(&bytes);
-        let p = read_property(&mut r, 46, 1000, "MapName", None).unwrap().unwrap();
+        let p = read_property(&mut r, 46, 1000, "MapName", None)
+            .unwrap()
+            .unwrap();
         assert_eq!(p.name, "mCount");
         assert_eq!(p.type_name, "Int");
         assert_eq!(p.index, Some(0));
@@ -362,7 +364,9 @@ mod tests {
         write_no_guid(&mut bytes);
         bytes.extend_from_slice(&3.5_f32.to_le_bytes());
         let mut r = Reader::new(&bytes);
-        let p = read_property(&mut r, 46, 1000, "MapName", None).unwrap().unwrap();
+        let p = read_property(&mut r, 46, 1000, "MapName", None)
+            .unwrap()
+            .unwrap();
         assert_eq!(p.type_name, "Float");
         match p.value {
             PropertyValue::Float(v) => assert!((v - 3.5).abs() < f32::EPSILON),
@@ -377,7 +381,9 @@ mod tests {
         write_no_guid(&mut bytes);
         bytes.extend_from_slice(&100.25_f64.to_le_bytes());
         let mut r = Reader::new(&bytes);
-        let p = read_property(&mut r, 46, 1000, "MapName", None).unwrap().unwrap();
+        let p = read_property(&mut r, 46, 1000, "MapName", None)
+            .unwrap()
+            .unwrap();
         assert_eq!(p.type_name, "Double");
         match p.value {
             PropertyValue::Double(v) => assert!((v - 100.25).abs() < f64::EPSILON),
@@ -392,7 +398,9 @@ mod tests {
         write_no_guid(&mut bytes);
         bytes.extend_from_slice(&(-7_i64).to_le_bytes());
         let mut r = Reader::new(&bytes);
-        let p = read_property(&mut r, 46, 1000, "MapName", None).unwrap().unwrap();
+        let p = read_property(&mut r, 46, 1000, "MapName", None)
+            .unwrap()
+            .unwrap();
         assert_eq!(p.type_name, "Int64");
         assert_eq!(p.value, PropertyValue::Int64(-7));
     }
@@ -404,7 +412,9 @@ mod tests {
         write_no_guid(&mut bytes);
         write_ascii(&mut bytes, "hello");
         let mut r = Reader::new(&bytes);
-        let p = read_property(&mut r, 46, 1000, "MapName", None).unwrap().unwrap();
+        let p = read_property(&mut r, 46, 1000, "MapName", None)
+            .unwrap()
+            .unwrap();
         assert_eq!(p.type_name, "Str");
         assert_eq!(p.value, PropertyValue::Str("hello".to_string()));
     }
@@ -416,7 +426,9 @@ mod tests {
         bytes.push(1); // value
         write_no_guid(&mut bytes);
         let mut r = Reader::new(&bytes);
-        let p = read_property(&mut r, 46, 1000, "MapName", None).unwrap().unwrap();
+        let p = read_property(&mut r, 46, 1000, "MapName", None)
+            .unwrap()
+            .unwrap();
         assert_eq!(p.value, PropertyValue::Bool(true));
     }
 
@@ -427,7 +439,9 @@ mod tests {
         bytes.push(0); // value
         write_no_guid(&mut bytes);
         let mut r = Reader::new(&bytes);
-        let p = read_property(&mut r, 46, 1000, "MapName", None).unwrap().unwrap();
+        let p = read_property(&mut r, 46, 1000, "MapName", None)
+            .unwrap()
+            .unwrap();
         assert_eq!(p.value, PropertyValue::Bool(false));
     }
 
@@ -440,7 +454,9 @@ mod tests {
         write_ascii(&mut bytes, "Persistent_Level");
         write_ascii(&mut bytes, "Persistent.Owner_42");
         let mut r = Reader::new(&bytes);
-        let p = read_property(&mut r, 46, 1000, "MapName", None).unwrap().unwrap();
+        let p = read_property(&mut r, 46, 1000, "MapName", None)
+            .unwrap()
+            .unwrap();
         assert_eq!(p.type_name, "Object");
         match p.value {
             PropertyValue::ObjectRef(obj) => {
@@ -460,7 +476,9 @@ mod tests {
         write_ascii(&mut bytes, "SubPath");
         bytes.extend_from_slice(&0_i32.to_le_bytes()); // trailer
         let mut r = Reader::new(&bytes);
-        let p = read_property(&mut r, 46, 1000, "MapName", None).unwrap().unwrap();
+        let p = read_property(&mut r, 46, 1000, "MapName", None)
+            .unwrap()
+            .unwrap();
         assert_eq!(p.type_name, "SoftObject");
         match p.value {
             PropertyValue::SoftObjectRef {

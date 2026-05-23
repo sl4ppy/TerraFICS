@@ -28,15 +28,54 @@ pub struct StructValue {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum StructKind {
-    Vector { x: f64, y: f64, z: f64 },
-    Rotator { x: f64, y: f64, z: f64 },
-    Vector2D { x: f64, y: f64 },
-    Vector4 { a: f64, b: f64, c: f64, d: f64 },
-    Quat { a: f64, b: f64, c: f64, d: f64 },
-    IntVector4 { a: i32, b: i32, c: i32, d: i32 },
-    IntPoint { x: i32, y: i32 },
-    LinearColor { r: f32, g: f32, b: f32, a: f32 },
-    Color { b: u8, g: u8, r: u8, a: u8 },
+    Vector {
+        x: f64,
+        y: f64,
+        z: f64,
+    },
+    Rotator {
+        x: f64,
+        y: f64,
+        z: f64,
+    },
+    Vector2D {
+        x: f64,
+        y: f64,
+    },
+    Vector4 {
+        a: f64,
+        b: f64,
+        c: f64,
+        d: f64,
+    },
+    Quat {
+        a: f64,
+        b: f64,
+        c: f64,
+        d: f64,
+    },
+    IntVector4 {
+        a: i32,
+        b: i32,
+        c: i32,
+        d: i32,
+    },
+    IntPoint {
+        x: i32,
+        y: i32,
+    },
+    LinearColor {
+        r: f32,
+        g: f32,
+        b: f32,
+        a: f32,
+    },
+    Color {
+        b: u8,
+        g: u8,
+        r: u8,
+        a: u8,
+    },
     Box {
         min: [f64; 3],
         max: [f64; 3],
@@ -46,7 +85,10 @@ pub enum StructKind {
     DateTime(i64),
     FluidBox(f32),
     TimerHandle(String),
-    FICFrameRange { begin: i64, end: i64 },
+    FICFrameRange {
+        begin: i64,
+        end: i64,
+    },
     OpaqueBlob(Vec<u8>),
     Nested(Vec<Property>),
 }
@@ -163,11 +205,7 @@ pub fn read_struct_property(
                 )
             };
             let is_valid = r.read_u8()?;
-            StructKind::Box {
-                min,
-                max,
-                is_valid,
-            }
+            StructKind::Box { min, max, is_valid }
         }
         "Guid" => {
             let arr = r.read_array::<16>()?;
@@ -348,11 +386,7 @@ mod tests {
         let mut r = Reader::new(&bytes);
         let v = read_struct_property(&mut r, 46, 1000, "MapName", None, 49).unwrap();
         match v.kind {
-            StructKind::Box {
-                min,
-                max,
-                is_valid,
-            } => {
+            StructKind::Box { min, max, is_valid } => {
                 assert!((min[0] - (-1.0)).abs() < f64::EPSILON);
                 assert!((max[2] - 3.0).abs() < f64::EPSILON);
                 assert_eq!(is_valid, 1);

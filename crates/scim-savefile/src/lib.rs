@@ -7,11 +7,12 @@
 //! - `read_body_envelope`: walk the body's outer structure (P1.2-b1)
 //! - `stream_actors`: iterate every (object header + entity body) pair across all
 //!   levels — zero-copy slices into the decompressed body (P1.2-b2)
-//! - `parse_entity_body`: decode actor preamble + primitive properties from an
-//!   entity body; composite property types stop iteration cleanly (P1.3-a)
+//! - `parse_entity_body`: decode actor preamble + ALL property types (primitives
+//!   from P1.3-a; composites Struct/Array/Map/Set/Enum/Byte/Text from P1.3-b).
+//!   Well-known struct subtypes decode to typed values; unknown struct subtypes
+//!   capture as `OpaqueBlob` so cursor advancement is always exact.
 //!
-//! Roadmap: P1.3-b adds composite property types (Struct, Array, Map, Set, Enum,
-//! Byte, Text). P1.3-c adds the `ClassDef` registry and the `Component` trait.
+//! Roadmap: P1.3-c adds the `ClassDef` registry and the `Component` trait.
 
 // modules added in later tasks
 pub mod error;
@@ -46,10 +47,10 @@ pub use property::{
 };
 pub mod entity_body;
 pub use entity_body::{parse_entity_body, EntityBody};
-pub mod property_struct;
 pub mod property_array;
 pub mod property_map;
+pub mod property_struct;
 pub use property_map::{read_mode_type, ModeType};
+pub mod property_enum_byte;
 pub mod property_set;
 pub mod property_text;
-pub mod property_enum_byte;

@@ -111,7 +111,14 @@ pub fn read_map_property(
     let mut entries = Vec::with_capacity(count_usize);
 
     for _ in 0..count_usize {
-        let key = read_map_key(r, save_version, ue5_version, map_name, parent_type, &key_type)?;
+        let key = read_map_key(
+            r,
+            save_version,
+            ue5_version,
+            map_name,
+            parent_type,
+            &key_type,
+        )?;
         let value = read_map_value(
             r,
             save_version,
