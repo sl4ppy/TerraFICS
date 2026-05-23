@@ -1,5 +1,13 @@
 [graph]
 all-features = true
+# v1 ships Windows x64 only (design spec §2). Restricting the graph to that
+# triple keeps cargo-deny from resolving non-Windows transitives (e.g.,
+# wasip2 / wit-bindgen on WASI, NDK on Android) that aren't compiled here
+# but can break `cargo metadata` when they require unreleased toolchain
+# features. Add other triples when v1 cross-compiles.
+targets = [
+  { triple = "x86_64-pc-windows-msvc" },
+]
 
 [advisories]
 version       = 2

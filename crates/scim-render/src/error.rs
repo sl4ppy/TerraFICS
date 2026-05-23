@@ -10,6 +10,7 @@ pub enum Error {
     #[error("no wgpu adapter available")]
     Adapter,
     /// Could not request a wgpu device.
+    // No #[from]: `Adapter::request_device` is async; callers wrap via `map_err(Error::Device)`.
     #[error("wgpu device request failed: {0}")]
     Device(wgpu::RequestDeviceError),
     /// Failed to create a wgpu surface from a window.
