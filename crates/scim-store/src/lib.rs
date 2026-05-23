@@ -1,4 +1,18 @@
-//! Stub crate for P1.1. Real code arrives in a later phase per the design doc.
+//! SQLite-backed project store for parsed Satisfactory saves.
+//!
+//! P1.4 capability lands incrementally:
+//! - Task 2: `Error` / `Result`
+//! - Task 3: schema DDL
+//! - Task 4: `SQLite` tuning
+//! - Task 5: `Db` connection wrapper
+//! - Task 6: blob storage (content-addressed via blake3 + zstd)
+//! - Task 7: actor storage
+//! - Task 8: snapshot creation
+//! - Task 9: per-snapshot header JSON
+//! - Task 10: `import_save` end-to-end
+//! - Task 11: read API
+//!
+//! Roadmap: P2 adds the edit path (immutable actor rows mean new rows per edit).
 
-#[doc(hidden)]
-pub const fn _placeholder() {}
+pub mod error;
+pub use error::{Error, Result};
