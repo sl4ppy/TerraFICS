@@ -71,6 +71,7 @@ impl Registry {
     }
 
     fn seed_vanilla(&mut self) {
+        // ConveyorBelt Mk1-Mk6.
         for mk in 1..=6 {
             self.add_def(ClassDef::vanilla(
                 format!(
@@ -79,6 +80,7 @@ impl Registry {
                 ClassKind::ConveyorBelt,
             ));
         }
+        // ConveyorLift Mk1-Mk6.
         for mk in 1..=6 {
             self.add_def(ClassDef::vanilla(
                 format!(
@@ -87,6 +89,7 @@ impl Registry {
                 ClassKind::ConveyorLift,
             ));
         }
+        // ConveyorChainActor variants.
         for name in [
             "/Script/FactoryGame.FGConveyorChainActor",
             "/Script/FactoryGame.FGConveyorChainActor_RepSizeMedium",
@@ -97,22 +100,52 @@ impl Registry {
             self.add_def(ClassDef::vanilla(name, ClassKind::ConveyorChainActor));
         }
 
-        self.add_def(ClassDef::vanilla(
+        // Splitter family: basic, merger, smart, programmable.
+        for name in [
             "/Game/FactoryGame/Buildable/Factory/CA_Splitter/Build_ConveyorAttachmentSplitter.Build_ConveyorAttachmentSplitter_C",
-            ClassKind::Splitter,
-        ));
+            "/Game/FactoryGame/Buildable/Factory/CA_Merger/Build_ConveyorAttachmentMerger.Build_ConveyorAttachmentMerger_C",
+            "/Game/FactoryGame/Buildable/Factory/CA_SplitterSmart/Build_ConveyorAttachmentSplitterSmart.Build_ConveyorAttachmentSplitterSmart_C",
+            "/Game/FactoryGame/Buildable/Factory/CA_SplitterProgrammable/Build_ConveyorAttachmentSplitterProgrammable.Build_ConveyorAttachmentSplitterProgrammable_C",
+        ] {
+            self.add_def(ClassDef::vanilla(name, ClassKind::Splitter));
+        }
+
+        // Miner Mk1-Mk3.
         self.add_def(ClassDef::vanilla(
             "/Game/FactoryGame/Buildable/Factory/MinerMK1/Build_MinerMk1.Build_MinerMk1_C",
             ClassKind::Miner,
         ));
         self.add_def(ClassDef::vanilla(
-            "/Game/FactoryGame/Buildable/Factory/PipelineMK1/Build_Pipeline.Build_Pipeline_C",
-            ClassKind::Pipeline,
+            "/Game/FactoryGame/Buildable/Factory/MinerMk2/Build_MinerMk2.Build_MinerMk2_C",
+            ClassKind::Miner,
         ));
         self.add_def(ClassDef::vanilla(
-            "/Script/FactoryGame.FGResourceNode",
-            ClassKind::ResourceNode,
+            "/Game/FactoryGame/Buildable/Factory/MinerMk3/Build_MinerMk3.Build_MinerMk3_C",
+            ClassKind::Miner,
         ));
+
+        // Pipeline family.
+        for name in [
+            "/Game/FactoryGame/Buildable/Factory/Pipeline/Build_Pipeline.Build_Pipeline_C",
+            "/Game/FactoryGame/Buildable/Factory/PipelineMk2/Build_PipelineMK2.Build_PipelineMK2_C",
+            "/Game/FactoryGame/Buildable/Factory/Pipeline/Build_Pipeline_NoIndicator.Build_Pipeline_NoIndicator_C",
+            "/Game/FactoryGame/Buildable/Factory/PipelineMk2/Build_PipelineMK2_NoIndicator.Build_PipelineMK2_NoIndicator_C",
+            "/Game/FactoryGame/Buildable/Factory/PipePump/Build_PipelinePump.Build_PipelinePump_C",
+            "/Game/FactoryGame/Buildable/Factory/PipePumpMk2/Build_PipelinePumpMK2.Build_PipelinePumpMk2_C",
+        ] {
+            self.add_def(ClassDef::vanilla(name, ClassKind::Pipeline));
+        }
+
+        // ResourceNode subclasses.
+        for name in [
+            "/Script/FactoryGame.FGResourceNode",
+            "/Script/FactoryGame.FGResourceDeposit",
+            "/Script/FactoryGame.FGResourceNodeFrackingCore",
+            "/Script/FactoryGame.FGResourceNodeFrackingSatellite",
+            "/Script/FactoryGame.FGResourceNodeGeyser",
+        ] {
+            self.add_def(ClassDef::vanilla(name, ClassKind::ResourceNode));
+        }
     }
 }
 
@@ -129,7 +162,7 @@ mod tests {
     #[test]
     fn new_seeds_vanilla_conveyors() {
         let r = Registry::new();
-        assert!(r.len() >= 21);
+        assert!(r.len() >= 30, "expected expanded seed; got {}", r.len());
         assert_eq!(
             r.classify("/Game/FactoryGame/Buildable/Factory/ConveyorBeltMk3/Build_ConveyorBeltMk3.Build_ConveyorBeltMk3_C"),
             ClassKind::ConveyorBelt
