@@ -37,13 +37,13 @@ pub fn read_body(body_bytes: &[u8], save_version: i32) -> Result<Vec<u8>> {
         let compressed_len =
             usize::try_from(h.compressed_size).expect("compressed_size fits usize");
         let compressed_start = r.position();
-        let compressed_end = compressed_start.checked_add(compressed_len).ok_or_else(|| {
-            Error::UnexpectedEof {
+        let compressed_end = compressed_start
+            .checked_add(compressed_len)
+            .ok_or_else(|| Error::UnexpectedEof {
                 wanted: compressed_len,
                 available: r.remaining(),
                 at: compressed_start,
-            }
-        })?;
+            })?;
         if compressed_end > body_bytes.len() {
             return Err(Error::UnexpectedEof {
                 wanted: compressed_len,
@@ -66,12 +66,13 @@ pub fn read_body(body_bytes: &[u8], save_version: i32) -> Result<Vec<u8>> {
         .par_iter()
         .map(|spec| {
             let compressed = &body_bytes[spec.compressed_range.clone()];
-            let out = miniz_oxide::inflate::decompress_to_vec_zlib(compressed).map_err(
-                |source| Error::ZlibInflate {
-                    at: spec.header_start,
-                    source,
-                },
-            )?;
+            let out =
+                miniz_oxide::inflate::decompress_to_vec_zlib(compressed).map_err(|source| {
+                    Error::ZlibInflate {
+                        at: spec.header_start,
+                        source,
+                    }
+                })?;
             let actual = u64::try_from(out.len()).expect("usize fits u64");
             let expected_u64 = u64::try_from(spec.uncompressed_size).expect("usize fits u64");
             if actual != expected_u64 {
