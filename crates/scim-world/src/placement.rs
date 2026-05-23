@@ -1,5 +1,7 @@
 //! Per-actor spatial entry indexed by the R-tree. See `index.rs`.
 
+use rstar::{RTreeObject, AABB};
+
 /// One entry in the world spatial index.
 ///
 /// Holds the actor's database id and its world-space translation (x, y, z).
@@ -13,8 +15,6 @@ pub struct ActorPlacement {
     pub position: [f32; 3],
 }
 
-use rstar::{RTreeObject, AABB};
-
 impl RTreeObject for ActorPlacement {
     type Envelope = AABB<[f32; 2]>;
 
@@ -24,6 +24,8 @@ impl RTreeObject for ActorPlacement {
 }
 
 #[cfg(test)]
+// Compares are bit-for-bit copies of the exact same f32 literals — no arithmetic
+// or conversion involved, so strict equality is intentional and meaningful.
 #[allow(clippy::float_cmp)]
 mod tests {
     use super::*;
