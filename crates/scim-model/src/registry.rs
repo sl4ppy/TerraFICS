@@ -9,6 +9,10 @@
 use std::collections::HashMap;
 
 use crate::classdef::{ClassDef, ClassKind};
+use crate::component::Component;
+use crate::components::{
+    ConveyorBelt, ConveyorChainActor, Miner, Pipeline, ResourceNode, Splitter,
+};
 
 #[derive(Debug, Clone)]
 pub struct Registry {
@@ -152,6 +156,50 @@ impl Registry {
 impl Default for Registry {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+/// Unified return type from `Registry::decode_for_actor` — one variant per
+/// concrete `Component` impl we know about.
+#[derive(Debug, Clone)]
+pub enum TypedComponent {
+    ConveyorBelt(ConveyorBelt),
+    ConveyorChainActor(ConveyorChainActor),
+    Splitter(Splitter),
+    Miner(Miner),
+    Pipeline(Pipeline),
+    ResourceNode(ResourceNode),
+}
+
+impl Registry {
+    /// Decode the actor into a typed component based on its `ClassKind`.
+    ///
+    /// Returns `Ok(None)` if the actor's class kind has no typed Component
+    /// impl yet (i.e. `Unknown` or anything we haven't added a decoder for).
+    /// Returns `Err(...)` if the actor's bytes don't match the expected
+    /// layout for its declared kind.
+    pub fn decode_for_actor(
+        &self,
+        raw_actor: &scim_savefile::RawActor<'_>,
+        body: &scim_savefile::EntityBody<'_>,
+    ) -> crate::error::Result<Option<TypedComponent>> {
+        let kind = self.classify(&raw_actor.header.class_name);
+        let typed = match kind {
+            ClassKind::ConveyorBelt | ClassKind::ConveyorLift => {
+                TypedComponent::ConveyorBelt(ConveyorBelt::decode(raw_actor, body)?)
+            }
+            ClassKind::ConveyorChainActor => {
+                TypedComponent::ConveyorChainActor(ConveyorChainActor::decode(raw_actor, body)?)
+            }
+            ClassKind::Splitter => TypedComponent::Splitter(Splitter::decode(raw_actor, body)?),
+            ClassKind::Miner => TypedComponent::Miner(Miner::decode(raw_actor, body)?),
+            ClassKind::Pipeline => TypedComponent::Pipeline(Pipeline::decode(raw_actor, body)?),
+            ClassKind::ResourceNode => {
+                TypedComponent::ResourceNode(ResourceNode::decode(raw_actor, body)?)
+            }
+            ClassKind::Unknown => return Ok(None),
+        };
+        Ok(Some(typed))
     }
 }
 
