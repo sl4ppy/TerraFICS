@@ -49,3 +49,16 @@ jobs:
       - uses: EmbarkStudios/cargo-deny-action@v2
         with:
           command: check
+
+  bench-build:
+    name: Bench compile
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: true
+      - uses: dtolnay/rust-toolchain@1.83.0
+      - uses: Swatinem/rust-cache@v2
+
+      - name: cargo bench --no-run
+        run: cargo bench --workspace --no-run --all-targets
