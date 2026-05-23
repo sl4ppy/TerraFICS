@@ -6,9 +6,12 @@ use bytemuck::{Pod, Zeroable};
 use wgpu::util::DeviceExt;
 use winit::window::Window;
 
+use scim_world::WorldIndex;
+
 use crate::camera::Camera2d;
 use crate::error::{Error, Result};
 use crate::instance::Instance;
+use crate::ActorId;
 
 /// Maximum instance count the renderer pre-allocates. 200k is comfortably
 /// above the spec §6.6 "~150k visible" target with headroom; bump if the
@@ -50,6 +53,8 @@ pub struct Renderer {
     index_buffer: wgpu::Buffer,
     instance_buffer: wgpu::Buffer,
     instance_count: u32,
+    actor_ids: Vec<ActorId>,
+    selection: Option<ActorId>,
     camera_uniform_buffer: wgpu::Buffer,
     camera_bind_group: wgpu::BindGroup,
 }
@@ -236,6 +241,8 @@ impl Renderer {
             index_buffer,
             instance_buffer,
             instance_count: 0,
+            actor_ids: Vec::new(),
+            selection: None,
             camera_uniform_buffer,
             camera_bind_group,
         })
@@ -251,14 +258,26 @@ impl Renderer {
         self.surface.configure(&self.device, &self.surface_config);
     }
 
-    /// Upload a fresh instance buffer. Counts above `MAX_INSTANCES` are
-    /// truncated silently — bump `MAX_INSTANCES` if needed.
-    pub fn upload_instances(&mut self, instances: &[Instance]) {
-        let count = instances.len().min(MAX_INSTANCES);
-        let bytes = bytemuck::cast_slice(&instances[..count]);
+    /// Upload a fresh instance buffer derived from `WorldIndex`. Walks the
+    /// index in `iter()` order; the same order is used for the actor-id
+    /// sidecar that backs picking. Counts above `MAX_INSTANCES` are
+    /// truncated silently.
+    pub fn upload_world(&mut self, world: &WorldIndex) {
+        let mut instances: Vec<Instance> = Vec::with_capacity(world.len());
+        let mut actor_ids: Vec<ActorId> = Vec::with_capacity(world.len());
+        for placement in world.iter().take(MAX_INSTANCES) {
+            instances.push(Instance {
+                position: placement.position,
+                flags: 0,
+            });
+            actor_ids.push(placement.actor_id);
+        }
+        let bytes = bytemuck::cast_slice(&instances);
         self.queue.write_buffer(&self.instance_buffer, 0, bytes);
         self.instance_count =
-            u32::try_from(count).expect("count <= MAX_INSTANCES (200k) fits in u32");
+            u32::try_from(instances.len()).expect("count <= MAX_INSTANCES (200k) fits in u32");
+        self.actor_ids = actor_ids;
+        self.selection = None;
     }
 
     /// Update the camera uniform from a `Camera2d`. 64 B write.
@@ -268,6 +287,54 @@ impl Renderer {
         };
         self.queue
             .write_buffer(&self.camera_uniform_buffer, 0, bytemuck::bytes_of(&uniform));
+    }
+
+    /// Set the currently-selected actor (or clear with `None`). Cheap:
+    /// flips at most two 4-byte slots in the instance buffer via
+    /// `queue.write_buffer`. Out-of-bag IDs (not present in the last
+    /// `upload_world`) clear the selection.
+    pub fn set_selection(&mut self, actor_id: Option<ActorId>) {
+        // Clear the old.
+        if let Some(prev_id) = self.selection.take() {
+            if let Some(prev_idx) = self.actor_index(prev_id) {
+                self.write_flags(prev_idx, 0);
+            }
+        }
+        // Set the new.
+        if let Some(new_id) = actor_id {
+            if let Some(new_idx) = self.actor_index(new_id) {
+                self.write_flags(new_idx, Instance::FLAG_SELECTED);
+                self.selection = Some(new_id);
+            }
+        }
+    }
+
+    /// The currently-selected actor, if any.
+    #[must_use]
+    pub const fn selection(&self) -> Option<ActorId> {
+        self.selection
+    }
+
+    /// Linear scan over the actor-id sidecar. For the P1.5-c instance
+    /// counts (< 200k) this is negligible; revisit if hover / multi-select
+    /// stress it.
+    fn actor_index(&self, actor_id: ActorId) -> Option<usize> {
+        self.actor_ids.iter().position(|&id| id == actor_id)
+    }
+
+    /// Write a 4 B flags value at the right offset in the instance buffer.
+    /// Offset within an Instance is 12 (after `position: [f32; 3]`); see
+    /// `selection_tests::flag_offset_within_instance_is_12`.
+    fn write_flags(&self, instance_index: usize, flags: u32) {
+        let instance_stride = u64::try_from(std::mem::size_of::<Instance>())
+            .expect("Instance stride fits in u64");
+        let flag_offset_within_instance: u64 = 12;
+        let buffer_offset = u64::try_from(instance_index)
+            .expect("instance_index fits in u64")
+            * instance_stride
+            + flag_offset_within_instance;
+        self.queue
+            .write_buffer(&self.instance_buffer, buffer_offset, bytemuck::bytes_of(&flags));
     }
 
     /// Render one frame.
@@ -323,5 +390,19 @@ impl Renderer {
         self.queue.submit(std::iter::once(encoder.finish()));
         frame.present();
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod selection_tests {
+    use super::*;
+
+    #[test]
+    fn flag_offset_within_instance_is_12() {
+        // The flags field is the last 4 bytes of the 16 B Instance.
+        // Selection writes go to `instance_index * 16 + 12`. Document the
+        // invariant so the upload code stays in sync with Instance layout.
+        assert_eq!(std::mem::size_of::<Instance>(), 16);
+        assert_eq!(std::mem::offset_of!(Instance, flags), 12);
     }
 }

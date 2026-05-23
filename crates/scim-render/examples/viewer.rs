@@ -13,7 +13,7 @@
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use scim_render::{build_instances, Camera2d, Renderer};
+use scim_render::{Camera2d, Renderer};
 use scim_store::{import::import_save, Db};
 use scim_world::WorldIndex;
 use winit::{
@@ -42,7 +42,7 @@ struct App {
 struct AppState {
     _db_dir: tempfile::TempDir,
     _db: Db,
-    _world: WorldIndex,
+    world: WorldIndex,
     window: Arc<Window>,
     renderer: Renderer,
     camera: Camera2d,
@@ -86,13 +86,12 @@ impl ApplicationHandler for App {
         let camera =
             Camera2d::with_params([0.0, 0.0], 200.0, [size.width.max(1), size.height.max(1)]);
 
-        let instances = build_instances(&world);
-        eprintln!("uploading {} instances", instances.len());
+        eprintln!("uploading {} placements via WorldIndex", world.len());
 
         let mut state = AppState {
             _db_dir: dir,
             _db: db,
-            _world: world,
+            world,
             window,
             renderer,
             camera,
@@ -101,7 +100,7 @@ impl ApplicationHandler for App {
             drag_anchor_screen: [0.0, 0.0],
             drag_anchor_center: [0.0, 0.0],
         };
-        state.renderer.upload_instances(&instances);
+        state.renderer.upload_world(&state.world);
         state.renderer.set_camera(&state.camera);
         state.window.request_redraw();
         self.state = Some(state);
