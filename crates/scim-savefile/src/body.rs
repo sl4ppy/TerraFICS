@@ -6,42 +6,91 @@
 //!
 //! Cross-reference: SC-InteractiveMap/src/SaveParser/Read.js:103-167.
 
+use std::ops::Range;
+
+use rayon::prelude::*;
+
 use crate::chunk_header::read_chunk_header;
 use crate::error::{Error, Result};
 use crate::reader::Reader;
 
+/// Spec for one chunk discovered during the header-walking pass.
+#[derive(Debug, Clone)]
+struct ChunkSpec {
+    header_start: usize,
+    compressed_range: Range<usize>,
+    uncompressed_size: usize,
+}
+
 /// Decompress all body chunks. `body_bytes` must start at the first byte AFTER the
 /// header — use the `consumed` value returned by `read_header` to obtain it.
+///
+/// Two-pass design: pass 1 walks the chunk headers serially to discover chunk
+/// boundaries, pass 2 decompresses chunks in parallel via `rayon`.
 pub fn read_body(body_bytes: &[u8], save_version: i32) -> Result<Vec<u8>> {
+    // Pass 1: serially walk chunk headers, collect ChunkSpec records.
     let mut r = Reader::new(body_bytes);
-    let mut out = Vec::new();
-
+    let mut specs = Vec::new();
     while r.remaining() > 0 {
-        let chunk_start = r.position();
+        let header_start = r.position();
         let h = read_chunk_header(&mut r, save_version)?;
-        let compressed =
-            r.read_hex(usize::try_from(h.compressed_size).expect("compressed_size fits usize"))?;
-
-        let decompressed =
-            miniz_oxide::inflate::decompress_to_vec_zlib(&compressed).map_err(|source| {
-                Error::ZlibInflate {
-                    at: chunk_start,
-                    source,
-                }
-            })?;
-
-        // Sanity: decompressed length should match the chunk's uncompressed_size.
-        let actual = u64::try_from(decompressed.len()).expect("usize fits u64");
-        if actual != h.uncompressed_size {
-            return Err(Error::ChunkLengthMismatch {
-                at: chunk_start,
-                expected: h.uncompressed_size,
-                actual,
+        let compressed_len =
+            usize::try_from(h.compressed_size).expect("compressed_size fits usize");
+        let compressed_start = r.position();
+        let compressed_end = compressed_start.checked_add(compressed_len).ok_or_else(|| {
+            Error::UnexpectedEof {
+                wanted: compressed_len,
+                available: r.remaining(),
+                at: compressed_start,
+            }
+        })?;
+        if compressed_end > body_bytes.len() {
+            return Err(Error::UnexpectedEof {
+                wanted: compressed_len,
+                available: r.remaining(),
+                at: compressed_start,
             });
         }
-        out.extend_from_slice(&decompressed);
+        let uncompressed_size =
+            usize::try_from(h.uncompressed_size).expect("uncompressed_size fits usize");
+        specs.push(ChunkSpec {
+            header_start,
+            compressed_range: compressed_start..compressed_end,
+            uncompressed_size,
+        });
+        r.seek(compressed_end);
     }
 
+    // Pass 2: parallel decompression. Each task produces a Vec<u8> for its chunk.
+    let decompressed: Vec<Result<Vec<u8>>> = specs
+        .par_iter()
+        .map(|spec| {
+            let compressed = &body_bytes[spec.compressed_range.clone()];
+            let out = miniz_oxide::inflate::decompress_to_vec_zlib(compressed).map_err(
+                |source| Error::ZlibInflate {
+                    at: spec.header_start,
+                    source,
+                },
+            )?;
+            let actual = u64::try_from(out.len()).expect("usize fits u64");
+            let expected_u64 = u64::try_from(spec.uncompressed_size).expect("usize fits u64");
+            if actual != expected_u64 {
+                return Err(Error::ChunkLengthMismatch {
+                    at: spec.header_start,
+                    expected: expected_u64,
+                    actual,
+                });
+            }
+            Ok(out)
+        })
+        .collect();
+
+    // Concatenate. Pre-compute total length to avoid repeated reallocs.
+    let total_len: usize = specs.iter().map(|s| s.uncompressed_size).sum();
+    let mut out = Vec::with_capacity(total_len);
+    for chunk_result in decompressed {
+        out.extend_from_slice(&chunk_result?);
+    }
     Ok(out)
 }
 
