@@ -6,3 +6,5 @@ pub mod conveyor_chain;
 pub use conveyor_chain::{ChainActorItem, ChainedConveyor, ConveyorChainActor, SplinePoint};
 pub mod splitter;
 pub use splitter::{Splitter, SplitterKind};
+pub mod miner;
+pub use miner::{Miner, MinerTier};
