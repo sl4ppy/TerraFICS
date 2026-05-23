@@ -80,13 +80,23 @@ impl ApplicationHandler for App {
             world.len()
         );
 
-        let renderer = pollster::block_on(Renderer::new(window.clone())).expect("Renderer::new");
+        let mut renderer = pollster::block_on(Renderer::new(window.clone())).expect("Renderer::new");
 
         let size = window.inner_size();
         let camera =
             Camera2d::with_params([0.0, 0.0], 200.0, [size.width.max(1), size.height.max(1)]);
 
         eprintln!("uploading {} placements via WorldIndex", world.len());
+
+        // Tiles: read TERRAFICS_TILE_ROOT env var. Empty / unset disables.
+        let tile_root = std::env::var_os("TERRAFICS_TILE_ROOT")
+            .map(std::path::PathBuf::from)
+            .filter(|p| !p.as_os_str().is_empty());
+        match &tile_root {
+            Some(path) => eprintln!("tiles enabled at {}", path.display()),
+            None => eprintln!("tiles disabled (TERRAFICS_TILE_ROOT not set)"),
+        }
+        renderer.set_tile_root(tile_root);
 
         let mut state = AppState {
             _db_dir: dir,
