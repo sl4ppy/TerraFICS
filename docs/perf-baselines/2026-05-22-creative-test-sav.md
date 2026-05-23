@@ -88,3 +88,30 @@ Notes:
   fine; at 1M+ it will become necessary. Culling lands when the spec §6.6
   perf headroom requires it — earliest in P1.5-c (picking shares the
   query infrastructure), latest if perf bites.
+
+## P1.5-c — picking + selection (added 2026-05-23)
+
+GPU click-pick + flag-bit selection highlight. No criterion bench (same
+reason as P1.5-b: no headless wgpu story we want to invest in for v1).
+Observational from the viewer on the baseline machine (i9-13900K + dedicated
+GPU, 17,974 instances, 1280×800 surface).
+
+| Metric | Observation |
+|---|---|
+| Click → tint round trip (renderer.pick + set_selection + redraw) | < 50 ms wall clock; visually instantaneous |
+| renderer.pick alone (encode + submit + map_async + device.poll(Wait)) | A few ms; bounded by GPU work + driver readback latency |
+| renderer.set_selection (two 4-byte queue.write_buffer calls) | Negligible (microseconds-scale) |
+| Pick texture memory | width × height × 4 B (~4 MB at 1280×800; ~12 MB at 1440p) — trivial |
+| Staging buffer | 256 B (one padded row for a single u32 readback) |
+
+Notes:
+- The blocking `device.poll(Wait)` is acceptable for click but NOT for hover.
+  Hover lands in a separate milestone with ring-buffered staging + async
+  poll, matching spec §6.3.
+- Scissored 1×1 pick pass means the rasteriser only colours one pixel per
+  click regardless of instance count. The dominant cost is the GPU submit +
+  driver-side readback latency, which is roughly fixed.
+- `actor_ids` linear scan in `set_selection` is O(n) over the instance
+  count (~18k at the corpus scale). At 18k that's negligible; if hover
+  hammers it 60 times per second at 1M instances, swap for a `HashMap<i64, usize>`
+  populated alongside `upload_world`. Documented; not changed in P1.5-c.
