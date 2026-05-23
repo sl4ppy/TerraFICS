@@ -57,3 +57,11 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     }
     return base;
 }
+
+// Pick pass: rasterise the same geometry but emit a per-instance handle
+// (1-based; 0 reserved for "no hit") into an R32_UINT target. Consumed by
+// PickPass — see picking.rs and design doc 2026-05-23-p1.5c.
+@fragment
+fn fs_pick(in: VsOut) -> @location(0) vec4<u32> {
+    return vec4<u32>(in.handle, 0u, 0u, 1u);
+}
