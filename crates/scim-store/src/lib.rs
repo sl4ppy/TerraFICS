@@ -24,3 +24,5 @@ pub mod db;
 pub use db::Db;
 pub mod blob;
 pub use blob::{insert_blob_if_absent, read_blob, BlobHash};
+pub mod actor;
+pub use actor::{decode_transform, encode_transform, insert_actor, list_actors_in_snapshot, ActorRow};
