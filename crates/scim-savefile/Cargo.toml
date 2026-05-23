@@ -28,3 +28,15 @@ harness = false
 [[bench]]
 name = "body_bench"
 harness = false
+
+[[bench]]
+name = "envelope_bench"
+harness = false
+
+[[bench]]
+name = "actor_stream_bench"
+harness = false
+
+[[bench]]
+name = "parse_entity_body_bench"
+harness = false
