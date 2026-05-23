@@ -45,8 +45,12 @@ fn import_creative_test_sav_to_fresh_project() {
     assert!(summary.blobs_inserted > 0);
     assert!(summary.blobs_inserted <= summary.total_actors);
 
+    // 30s on the CI runner; ~5s on a typical dev machine. The point of this
+    // assertion isn't to enforce the spec's "1 GB < 5s" budget (we don't have a
+    // 1 GB fixture); it's to catch the "tuning silently broken" failure mode
+    // where the import takes 5+ minutes.
     assert!(
-        elapsed.as_secs_f64() < 10.0,
+        elapsed.as_secs_f64() < 30.0,
         "import took {:.2}s; SQLite tuning may be off",
         elapsed.as_secs_f64()
     );
