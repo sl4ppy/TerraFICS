@@ -27,7 +27,7 @@ struct VsIn {
 struct VsOut {
     @builtin(position) clip: vec4<f32>,
     @location(0) @interpolate(flat) flags: u32,
-    @location(1) @interpolate(flat) handle: u32,
+    @location(1) @interpolate(flat) pick_handle: u32,
 };
 
 const QUAD_HALF_EXTENT_WORLD: f32 = 50.0; // 100 unit square (±50)
@@ -44,7 +44,7 @@ fn vs_main(in: VsIn, @builtin(instance_index) instance_idx: u32) -> VsOut {
     var out: VsOut;
     out.clip = camera.view_proj * world;
     out.flags = in.flags;
-    out.handle = instance_idx + 1u; // 1-based; 0 reserved for "no hit" in the pick pass
+    out.pick_handle = instance_idx + 1u; // 1-based; 0 reserved for "no hit" in the pick pass
     return out;
 }
 
@@ -59,9 +59,10 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
 }
 
 // Pick pass: rasterise the same geometry but emit a per-instance handle
-// (1-based; 0 reserved for "no hit") into an R32_UINT target. Consumed by
-// PickPass — see picking.rs and design doc 2026-05-23-p1.5c.
+// (1-based; 0 reserved for "no hit") into an R32_UINT target. `handle` is
+// a reserved word in WGSL so the varying is named `pick_handle`. Consumed
+// by PickPass — see picking.rs and design doc 2026-05-23-p1.5c.
 @fragment
 fn fs_pick(in: VsOut) -> @location(0) vec4<u32> {
-    return vec4<u32>(in.handle, 0u, 0u, 1u);
+    return vec4<u32>(in.pick_handle, 0u, 0u, 1u);
 }
