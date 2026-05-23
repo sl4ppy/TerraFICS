@@ -16,3 +16,5 @@
 
 pub mod error;
 pub use error::{Error, Result};
+pub mod schema;
+pub use schema::apply_schema;
