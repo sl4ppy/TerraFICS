@@ -19,4 +19,7 @@ pub use manifest::{load_manifest, load_manifests_from_dir, ModManifest, ModManif
 pub mod registry;
 pub use registry::Registry;
 pub mod components;
-pub use components::{ConveyorBelt, ConveyorBeltItem};
+pub use components::{
+    ChainActorItem, ChainedConveyor, ConveyorBelt, ConveyorBeltItem, ConveyorChainActor,
+    SplinePoint,
+};

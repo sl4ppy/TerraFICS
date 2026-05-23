@@ -27,6 +27,9 @@ pub enum Error {
 
     #[error("ConveyorBelt decode: expected count + items_length + items at the end of entity body, found {bytes_remaining} bytes remaining after decode")]
     ConveyorBeltTrailingBytes { bytes_remaining: usize },
+
+    #[error("ConveyorChainActor decode: {bytes_remaining} bytes remaining after decode (expected 0)")]
+    ConveyorChainActorTrailingBytes { bytes_remaining: usize },
 }
 
 #[allow(unused_attributes)]
