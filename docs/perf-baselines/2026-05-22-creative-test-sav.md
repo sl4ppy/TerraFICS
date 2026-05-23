@@ -35,3 +35,25 @@ cargo bench -p scim-savefile
 cargo bench -p scim-store
 Pop-Location
 ```
+
+## P1.5-a — `scim-world` spatial index (added 2026-05-23)
+
+Build + query of the R-tree over the actors in the CREATIVE TEST.sav snapshot.
+Baseline machine: i9-13900K. The R-tree holds 17,974 entries (Object-kind rows
+with NULL transforms are skipped — 5,967 of the 23,941 total actors are non-spatial).
+
+| Bench | Low | Median | High |
+|---|---|---|---|
+| `scim_world::from_snapshot / CREATIVE TEST.sav` | 14.448 ms | 14.531 ms | 14.604 ms |
+| `scim_world::query_aabb / viewport_100k`        | 6.6877 µs | 6.7163 µs | 6.7454 µs |
+
+Notes:
+- `from_snapshot` cost is dominated by the SQLite `SELECT … FROM actor` plus
+  per-row transform decode. The `rstar::bulk_load` step is `O(n log n)` and is
+  the smaller fraction. The bench measures the warm-DB case; cold first-load
+  (immediately after `import_save`) costs ~63 ms because the WAL is still
+  flushing — measured by the `from_snapshot_corpus` integration test.
+- `query_aabb` returns an iterator; the bench `.count()`s it to force
+  realization. At 6.7 µs per viewport query the per-frame cost is well under
+  the 60 fps budget (16.7 ms) — the renderer's spatial-cull pass has plenty of
+  headroom even at 1 GB+ saves with proportionally more placements.
