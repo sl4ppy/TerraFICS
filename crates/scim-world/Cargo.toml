@@ -7,7 +7,6 @@ authors.workspace      = true
 license.workspace      = true
 
 [dependencies]
-scim-savefile = { path = "../scim-savefile", version = "0.1.0" }
 scim-store    = { path = "../scim-store",    version = "0.1.0" }
 rusqlite      = { workspace = true }
 thiserror     = { workspace = true }

@@ -613,7 +613,6 @@ dependencies = [
  "criterion",
  "rstar",
  "rusqlite",
- "scim-savefile",
  "scim-store",
  "tempfile",
  "thiserror",

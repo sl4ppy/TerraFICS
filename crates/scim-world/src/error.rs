@@ -1,4 +1,5 @@
 //! Error type for `scim-world`.
+//! No `anyhow` per design spec §11.1.
 
 use thiserror::Error;
 
