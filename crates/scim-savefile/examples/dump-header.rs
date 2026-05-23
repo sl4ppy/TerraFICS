@@ -112,6 +112,13 @@ fn main() -> ExitCode {
                     println!("actors:              {total}");
                     println!("properties:          {prop_total}");
                     println!("fully_parsed_actors: {fully}");
+                    #[allow(clippy::cast_precision_loss)]
+                    let pct = if total > 0 {
+                        (fully as f64 / total as f64) * 100.0
+                    } else {
+                        0.0
+                    };
+                    println!("fully_parsed_pct:    {pct:.1}%");
                 }
                 Err(e) => eprintln!("warning: envelope: {e}"),
             }

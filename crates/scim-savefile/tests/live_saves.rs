@@ -254,8 +254,15 @@ fn parse_one(path: &Path) -> Result<Outcome, String> {
                     }
                 }
             }
+            let total = fully + stopped;
+            #[allow(clippy::cast_precision_loss)]
+            let pct = if total > 0 {
+                (fully as f64 / total as f64) * 100.0
+            } else {
+                100.0
+            };
             eprintln!(
-                "      properties: {tally} decoded ({fully} actors fully parsed, {stopped} stopped on composite, first composite: {first_unsupp:?})"
+                "      properties: {tally} decoded; {fully}/{total} actors fully parsed ({pct:.1}%); first unsupported: {first_unsupp:?}"
             );
         }
     } else {
