@@ -23,6 +23,8 @@ pub mod instance;
 pub use instance::{build_instances, Instance};
 pub mod renderer;
 pub use renderer::Renderer;
+pub mod picking;
+pub use picking::PickPass;
 
 /// The `i64` row id of an actor in `scim-store`. Re-exported so consumers
 /// of `scim-render` don't have to pull in `scim-store` to talk about
