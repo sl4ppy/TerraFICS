@@ -22,3 +22,5 @@ pub mod tuning;
 pub use tuning::apply_tuning;
 pub mod db;
 pub use db::Db;
+pub mod blob;
+pub use blob::{insert_blob_if_absent, read_blob, BlobHash};
