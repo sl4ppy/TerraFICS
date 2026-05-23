@@ -154,20 +154,26 @@ impl ApplicationHandler for App {
                 state: bstate,
                 button,
                 ..
-            } => {
-                if button == MouseButton::Right {
-                    match bstate {
-                        ElementState::Pressed => {
-                            state.right_dragging = true;
-                            state.drag_anchor_screen = state.cursor;
-                            state.drag_anchor_center = state.camera.center();
-                        }
-                        ElementState::Released => {
-                            state.right_dragging = false;
-                        }
-                    }
+            } => match (button, bstate) {
+                (MouseButton::Right, ElementState::Pressed) => {
+                    state.right_dragging = true;
+                    state.drag_anchor_screen = state.cursor;
+                    state.drag_anchor_center = state.camera.center();
                 }
-            }
+                (MouseButton::Right, ElementState::Released) => {
+                    state.right_dragging = false;
+                }
+                (MouseButton::Left, ElementState::Pressed) => {
+                    let picked = state.renderer.pick(state.cursor);
+                    match picked {
+                        Some(id) => eprintln!("picked actor_id = {id}"),
+                        None => eprintln!("picked: no hit"),
+                    }
+                    state.renderer.set_selection(picked);
+                    state.window.request_redraw();
+                }
+                _ => {}
+            },
             WindowEvent::MouseWheel { delta, .. } => {
                 let steps = match delta {
                     MouseScrollDelta::LineDelta(_x, y) => y,
