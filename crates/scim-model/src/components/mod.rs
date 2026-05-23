@@ -8,3 +8,5 @@ pub mod splitter;
 pub use splitter::{Splitter, SplitterKind};
 pub mod miner;
 pub use miner::{Miner, MinerTier};
+pub mod pipeline;
+pub use pipeline::{Pipeline, PipelineKind};
