@@ -12,3 +12,5 @@ pub mod error;
 pub use error::{Error, Result};
 pub mod classdef;
 pub use classdef::{ClassDef, ClassKind, ModId};
+pub mod registry;
+pub use registry::Registry;
