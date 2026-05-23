@@ -1,4 +1,12 @@
-//! Stub crate for P1.1. Real code arrives in a later phase per the design doc.
+//! Typed game-domain model on top of the byte-level `scim-savefile` parser.
+//!
+//! Capability lands incrementally across P1.3-c tasks:
+//! - Task 3: `Error` / `Result`
+//! - Task 4: `ClassDef`, `ClassKind`, `ModId`
+//! - Task 5: `Registry`
+//! - Task 6: `Component` trait
+//! - Task 7: `ConveyorBelt` reference component
+//! - Task 8: `ModManifest` + TOML loader
 
-#[doc(hidden)]
-pub const fn _placeholder() {}
+pub mod error;
+pub use error::{Error, Result};
