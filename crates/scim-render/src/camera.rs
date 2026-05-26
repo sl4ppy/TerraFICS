@@ -71,7 +71,9 @@ impl Camera2d {
     }
 
     /// Convert a screen-pixel point (origin = top-left, +Y = down) to a
-    /// world-space (x, y).
+    /// world-space (x, y). Uses SCIM's CRS.Simple convention where
+    /// +Y world goes south (DOWN on screen). So screen +Y maps to world
+    /// +Y directly — no sign flip.
     #[must_use]
     pub fn world_from_screen(&self, screen_xy: [f32; 2]) -> [f32; 2] {
         // Loss of precision when viewport > 16M pixels — not a real workload.
@@ -80,11 +82,10 @@ impl Camera2d {
         #[allow(clippy::cast_precision_loss)]
         let half_height = self.viewport[1] as f32 * 0.5;
         let offset_x = screen_xy[0] - half_width;
-        // Flip Y so that +Y on screen (down) becomes -Y in world space.
         let offset_y = screen_xy[1] - half_height;
         [
             offset_x.mul_add(self.units_per_pixel, self.center[0]),
-            (-offset_y).mul_add(self.units_per_pixel, self.center[1]),
+            offset_y.mul_add(self.units_per_pixel, self.center[1]),
         ]
     }
 
@@ -116,11 +117,13 @@ impl Camera2d {
         #[allow(clippy::cast_precision_loss)]
         let half_height_world = self.viewport[1] as f32 * 0.5 * self.units_per_pixel;
         // Orthographic projection (right-handed, +Z forward = into screen).
+        // Y is flipped: bottom = +half_h, top = -half_h. This matches SCIM's
+        // CRS.Simple convention where world +Y goes south (DOWN on screen).
         let proj = Mat4::orthographic_rh(
             -half_width_world,
             half_width_world,
-            -half_height_world,
             half_height_world,
+            -half_height_world,
             -1.0e6,
             1.0e6,
         );

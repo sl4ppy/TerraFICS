@@ -264,6 +264,14 @@ impl TilePass {
         visible
     }
 
+    /// Are any tile loads still in-flight on the background thread?
+    /// Used by the viewer to know whether to request another redraw so
+    /// newly-arrived tiles get drawn before the user interacts again.
+    #[must_use]
+    pub fn has_pending_loads(&self) -> bool {
+        !self.in_flight.is_empty()
+    }
+
     /// Encode tile draws into the active render pass. Called between the
     /// pass clear and the footprint draws.
     pub fn encode<'pass>(

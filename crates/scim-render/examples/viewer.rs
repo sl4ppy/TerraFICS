@@ -10,11 +10,12 @@
 //!   - Resize: handled automatically
 //!   - Escape or close button: quit
 
+use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
 
 use scim_render::{Camera2d, Renderer};
-use scim_store::{import::import_save, Db};
+use scim_store::{import::import_save, list_actors_in_snapshot, Db};
 use scim_world::WorldIndex;
 use winit::{
     application::ApplicationHandler,
@@ -43,6 +44,7 @@ struct AppState {
     _db_dir: tempfile::TempDir,
     _db: Db,
     world: WorldIndex,
+    actor_names: HashMap<i64, (String, String)>, // actor_id -> (class_name, path_name)
     window: Arc<Window>,
     renderer: Renderer,
     camera: Camera2d,
@@ -73,6 +75,13 @@ impl ApplicationHandler for App {
         let summary = import_save(&mut db, &self.save_path, "viewer").expect("import_save");
         let world =
             WorldIndex::from_snapshot(db.conn(), summary.snapshot_id).expect("from_snapshot");
+        // Build actor_id -> (class_name, path_name) lookup for the click handler.
+        let actor_names: HashMap<i64, (String, String)> =
+            list_actors_in_snapshot(db.conn(), summary.snapshot_id)
+                .expect("list_actors_in_snapshot")
+                .into_iter()
+                .map(|row| (row.id, (row.class_name, row.path_name)))
+                .collect();
         eprintln!(
             "loaded {} ({} actors, {} indexed placements)",
             self.save_path.display(),
@@ -102,6 +111,7 @@ impl ApplicationHandler for App {
             _db_dir: dir,
             _db: db,
             world,
+            actor_names,
             window,
             renderer,
             camera,
@@ -151,7 +161,10 @@ impl ApplicationHandler for App {
                     state.camera = Camera2d::with_params(
                         [
                             dx.mul_add(-upp, state.drag_anchor_center[0]),
-                            dy.mul_add(upp, state.drag_anchor_center[1]),
+                            // World +Y now points DOWN on screen (SCIM convention),
+                            // so dragging down (dy > 0) should DECREASE world Y to
+                            // make the world appear to follow the cursor.
+                            dy.mul_add(-upp, state.drag_anchor_center[1]),
                         ],
                         upp,
                         state.camera.viewport(),
@@ -174,10 +187,23 @@ impl ApplicationHandler for App {
                     state.right_dragging = false;
                 }
                 (MouseButton::Left, ElementState::Pressed) => {
+                    let world = state.camera.world_from_screen(state.cursor);
                     let picked = state.renderer.pick(state.cursor);
                     match picked {
-                        Some(id) => eprintln!("picked actor_id = {id}"),
-                        None => eprintln!("picked: no hit"),
+                        Some(id) => {
+                            let label = state.actor_names.get(&id).map_or_else(
+                                || String::from("<unknown>"),
+                                |(class, path)| format!("{class}  ({path})"),
+                            );
+                            eprintln!(
+                                "picked id={id} class+path={label} screen=({:.0},{:.0}) world=({:.0},{:.0})",
+                                state.cursor[0], state.cursor[1], world[0], world[1]
+                            );
+                        }
+                        None => eprintln!(
+                            "picked: no hit at screen=({:.0},{:.0}) world=({:.0},{:.0})",
+                            state.cursor[0], state.cursor[1], world[0], world[1]
+                        ),
                     }
                     state.renderer.set_selection(picked);
                     state.window.request_redraw();
@@ -199,6 +225,11 @@ impl ApplicationHandler for App {
             WindowEvent::RedrawRequested => {
                 if let Err(e) = state.renderer.render() {
                     eprintln!("render error: {e}");
+                }
+                // Keep redrawing while tiles are still streaming in so newly
+                // arrived ones appear without requiring user input.
+                if state.renderer.tiles_loading() {
+                    state.window.request_redraw();
                 }
             }
             _ => {}

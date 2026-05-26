@@ -45,12 +45,10 @@ fn vs_main(in: VsIn) -> VsOut {
     let world_y = mix(min_y, max_y, in.quad_pos.y);
     var out: VsOut;
     out.clip = camera.view_proj * vec4<f32>(world_x, world_y, 0.0, 1.0);
-    // Y-flip in UV space: tile pixel (u=0, v=0) is the NORTH-WEST corner,
-    // which in world space is (min_x, min_y) (SCIM CRS.Simple). The unit
-    // quad's quad_pos.y=0 maps to world min_y. UV.v should also be 0 when
-    // sampling the top of the texture image. So uv.v = quad_pos.y.
-    // If tiles render upside-down in the viewer smoke, change to:
-    //     out.uv = vec2<f32>(in.quad_pos.x, 1.0 - in.quad_pos.y);
+    // SCIM tile pixel (u=0, v=0) is the NORTH-WEST corner. The unit quad's
+    // quad_pos.y=0 is mapped to world `min_y` (see tile_world_aabb's y math
+    // for which world-Y direction that means). UV.v = quad_pos.y is the
+    // default — adjust tile_world_aabb if the texture comes out mirrored.
     out.uv = vec2<f32>(in.quad_pos.x, in.quad_pos.y);
     return out;
 }

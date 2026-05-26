@@ -481,6 +481,14 @@ impl Renderer {
         self.selection
     }
 
+    /// True if the tile loader has outstanding requests that haven't yet
+    /// produced GPU-resident tiles. Viewer uses this to keep requesting
+    /// redraws until the visible tile set has stabilised.
+    #[must_use]
+    pub fn tiles_loading(&self) -> bool {
+        self.tile_pass.as_ref().is_some_and(TilePass::has_pending_loads)
+    }
+
     /// Set the root directory containing tile pyramid PNGs laid out as
     /// `{root}/{z}/{x}/{y}.png`. `None` disables tiles entirely; the
     /// renderer keeps working with the existing dark background under
