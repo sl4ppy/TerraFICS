@@ -115,3 +115,36 @@ Notes:
   count (~18k at the corpus scale). At 18k that's negligible; if hover
   hammers it 60 times per second at 1M instances, swap for a `HashMap<i64, usize>`
   populated alongside `upload_world`. Documented; not changed in P1.5-c.
+
+## P1.5-d — base map tiles (added 2026-05-26)
+
+PNG tile pyramid rendered under the actor footprints; alpha-blended
+footprints (0.65 base / 0.85 selected). Local files only — no CDN fetch
+in this milestone. Same wgpu-no-headless policy as P1.5-b/c: numbers below
+are observational from the viewer on the baseline machine (i9-13900K +
+dedicated GPU) with real Test_01.sav and SCIM's "Stable"-build z=3..z=5
+tiles fetched via scripts/fetch-tiles.ps1.
+
+| Metric | Observation |
+|---|---|
+| Zoom-selection + visible-tile enumeration per frame | < 10 µs at typical visible-tile counts |
+| First-frame-with-tiles latency (cold launch, no resident tiles) | 1–3 frames; viewer redraws while tiles are streaming in (tiles_loading() loop) |
+| Tile decode (PNG → RGBA8) on background thread | A few ms per 256×256 tile; bounded by `image 0.25`'s PNG decoder |
+| Tile GPU upload (`queue.write_texture`, 256 KB per tile) | Negligible (microseconds) |
+| Visible-and-resident tile draw (one bind-per-tile + 6 indices) | tens of tiles per frame; well under the 16.7 ms budget at 60 FPS |
+| Per-frame VRAM (256 resident tiles × 256² × 4 B) | 64 MB — bounded by `MAX_RESIDENT_TILES` |
+| Alpha-blending the footprint pass | Negligible (fixed-function blend over ~17k visible quads) |
+
+Notes:
+- LRU eviction is O(n log n) on the sort but only runs when the cache is
+  over budget; ~256 entries makes this trivial.
+- Loader-thread request channel is unbounded; pathological camera paths
+  could back it up but no real workload reaches that.
+- The blocking `device.poll(Wait)` in `Renderer::pick` (P1.5-c) is unaffected
+  by tiles — picking operates on the footprint pipeline only, and tiles
+  don't enter the R32_UINT pick pass.
+- Tile pyramid math: at z=N, each tile is `TILE_PYRAMID_SIZE / 2^N` game
+  units wide, where `TILE_PYRAMID_SIZE = 1_500_001` (derived from SCIM's
+  `scale(zoomRatio) * xMax / backgroundSize`). Pyramid extends past the
+  displayed bounds; tiles outside the playable area 404 on the CDN and are
+  cached as `failed` to avoid re-requests.
