@@ -81,9 +81,11 @@ pub const TILE_PIXEL_SIZE: u32 = 256;
 #[allow(clippy::excessive_precision)]
 pub const TILE_PYRAMID_WEST: f32 = -418_448.92;
 
-/// Game-world coordinate of the northern edge of the tile pyramid
-/// (= `mappingBoundNorth` after `start()` expansion). Tile (z, _, 0) starts
-/// here on the Y axis (most-negative-Y in SCIM's CRS.Simple convention).
+/// Game-world coordinate of the northern edge of the tile pyramid.
+///
+/// Equals `mappingBoundNorth` after `start()` expansion. Tile (z, _, 0)
+/// starts here on the Y axis (most-negative-Y in SCIM's CRS.Simple
+/// convention).
 pub const TILE_PYRAMID_NORTH: f32 = -468_750.0;
 
 /// Game-units-per-axis of the FULL tile pyramid (NOT just the displayed
