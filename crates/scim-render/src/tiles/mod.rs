@@ -228,8 +228,7 @@ impl TilePass {
             self.in_flight.remove(&delivered.key);
             match delivered.result {
                 Ok(bytes) => {
-                    let resident =
-                        self.create_resident_tile(device, queue, delivered.key, &bytes);
+                    let resident = self.create_resident_tile(device, queue, delivered.key, &bytes);
                     self.resident.insert(delivered.key, resident);
                 }
                 Err(_) => {
@@ -242,7 +241,10 @@ impl TilePass {
         for key in &visible {
             if let Some(r) = self.resident.get_mut(key) {
                 r.last_touched_frame = self.frame_counter;
-            } else if !self.in_flight.contains(key) && !self.failed.contains(key) && self.loader.request(*key) {
+            } else if !self.in_flight.contains(key)
+                && !self.failed.contains(key)
+                && self.loader.request(*key)
+            {
                 self.in_flight.insert(*key);
             }
         }

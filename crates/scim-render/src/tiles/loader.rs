@@ -75,7 +75,9 @@ impl LoaderHandle {
     /// Enqueue a tile load. Returns `false` if the worker has died (rare).
     #[must_use]
     pub fn request(&self, key: TileKey) -> bool {
-        self.requests.as_ref().map_or(false, |tx| tx.send(key).is_ok())
+        self.requests
+            .as_ref()
+            .map_or(false, |tx| tx.send(key).is_ok())
     }
 
     /// Non-blocking drain of decoded tiles delivered since the last call.
@@ -147,7 +149,8 @@ mod tests {
     fn tempdir_with_fixture(zoom: u8, x: u32, y: u32) -> tempfile::TempDir {
         let dir = tempfile::tempdir().expect("tempdir");
         let dst = tile_path(dir.path(), TileKey { zoom, x, y });
-        std::fs::create_dir_all(dst.parent().expect("tile_path has at least 2 ancestors")).expect("create dirs");
+        std::fs::create_dir_all(dst.parent().expect("tile_path has at least 2 ancestors"))
+            .expect("create dirs");
         std::fs::copy(fixture_path(), &dst).expect("copy fixture");
         dir
     }
@@ -156,7 +159,11 @@ mod tests {
     fn load_existing_tile_returns_rgba_bytes() {
         let dir = tempdir_with_fixture(3, 0, 0);
         let loader = LoaderHandle::spawn(dir.path().to_path_buf());
-        assert!(loader.request(TileKey { zoom: 3, x: 0, y: 0 }));
+        assert!(loader.request(TileKey {
+            zoom: 3,
+            x: 0,
+            y: 0
+        }));
 
         // Poll for up to ~1 second for the decoded tile to arrive.
         let start = std::time::Instant::now();
@@ -169,7 +176,14 @@ mod tests {
         }
         assert_eq!(got.len(), 1, "did not receive any tile within 1s");
         let payload = got.into_iter().next().unwrap();
-        assert_eq!(payload.key, TileKey { zoom: 3, x: 0, y: 0 });
+        assert_eq!(
+            payload.key,
+            TileKey {
+                zoom: 3,
+                x: 0,
+                y: 0
+            }
+        );
         let bytes = payload.result.expect("decode ok");
         // 256x256 RGBA8 = 262144 bytes.
         assert_eq!(bytes.len(), 256 * 256 * 4);
@@ -179,7 +193,11 @@ mod tests {
     fn load_missing_tile_returns_not_found() {
         let dir = tempfile::tempdir().expect("tempdir");
         let loader = LoaderHandle::spawn(dir.path().to_path_buf());
-        assert!(loader.request(TileKey { zoom: 4, x: 1, y: 2 }));
+        assert!(loader.request(TileKey {
+            zoom: 4,
+            x: 1,
+            y: 2
+        }));
 
         let start = std::time::Instant::now();
         let mut got = Vec::new();

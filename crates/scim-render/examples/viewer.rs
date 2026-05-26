@@ -89,7 +89,8 @@ impl ApplicationHandler for App {
             world.len()
         );
 
-        let mut renderer = pollster::block_on(Renderer::new(window.clone())).expect("Renderer::new");
+        let mut renderer =
+            pollster::block_on(Renderer::new(window.clone())).expect("Renderer::new");
 
         let size = window.inner_size();
         let camera =

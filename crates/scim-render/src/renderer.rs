@@ -486,7 +486,9 @@ impl Renderer {
     /// redraws until the visible tile set has stabilised.
     #[must_use]
     pub fn tiles_loading(&self) -> bool {
-        self.tile_pass.as_ref().is_some_and(TilePass::has_pending_loads)
+        self.tile_pass
+            .as_ref()
+            .is_some_and(TilePass::has_pending_loads)
     }
 
     /// Set the root directory containing tile pyramid PNGs laid out as

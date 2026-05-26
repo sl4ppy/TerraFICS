@@ -169,8 +169,7 @@ pub fn visible_tiles(zoom: u8, camera_world_aabb: [f32; 4]) -> Vec<TileKey> {
     let x1 = x1.min(tiles_per_axis);
     let y1 = y1.min(tiles_per_axis);
 
-    let cap = ((x1.saturating_sub(x0)) as usize)
-        .saturating_mul((y1.saturating_sub(y0)) as usize);
+    let cap = ((x1.saturating_sub(x0)) as usize).saturating_mul((y1.saturating_sub(y0)) as usize);
     let mut out = Vec::with_capacity(cap);
     for y in y0..y1 {
         for x in x0..x1 {
@@ -235,7 +234,12 @@ mod tests {
     fn visible_tiles_full_pyramid_at_z3_returns_64() {
         let pyramid_east = TILE_PYRAMID_WEST + TILE_PYRAMID_SIZE;
         let pyramid_south = TILE_PYRAMID_NORTH + TILE_PYRAMID_SIZE;
-        let aabb = [TILE_PYRAMID_WEST, TILE_PYRAMID_NORTH, pyramid_east, pyramid_south];
+        let aabb = [
+            TILE_PYRAMID_WEST,
+            TILE_PYRAMID_NORTH,
+            pyramid_east,
+            pyramid_south,
+        ];
         let tiles = visible_tiles(3, aabb);
         assert_eq!(tiles.len(), 64);
     }
@@ -244,7 +248,11 @@ mod tests {
     fn visible_tiles_tiny_aabb_at_origin_returns_one_or_two() {
         let aabb = [-0.5, -0.5, 0.5, 0.5];
         let tiles = visible_tiles(5, aabb);
-        assert!(tiles.len() == 1 || tiles.len() == 2, "got {} tiles", tiles.len());
+        assert!(
+            tiles.len() == 1 || tiles.len() == 2,
+            "got {} tiles",
+            tiles.len()
+        );
     }
 
     #[test]
@@ -252,7 +260,11 @@ mod tests {
         let pyramid_east = TILE_PYRAMID_WEST + TILE_PYRAMID_SIZE;
         let aabb = [pyramid_east + 1000.0, 0.0, pyramid_east + 2000.0, 1000.0];
         let tiles = visible_tiles(5, aabb);
-        assert!(tiles.is_empty(), "expected empty, got {} tiles", tiles.len());
+        assert!(
+            tiles.is_empty(),
+            "expected empty, got {} tiles",
+            tiles.len()
+        );
     }
 
     #[test]
@@ -272,8 +284,20 @@ mod tests {
         // tile (3, 0, 1). Verify our math agrees.
         let actor = [-242_380.0_f32, -125_005.0];
         let aabb = tile_world_aabb(3, 0, 1);
-        assert!(actor[0] >= aabb[0] && actor[0] <= aabb[2], "x: actor {} aabb [{}, {}]", actor[0], aabb[0], aabb[2]);
-        assert!(actor[1] >= aabb[1] && actor[1] <= aabb[3], "y: actor {} aabb [{}, {}]", actor[1], aabb[1], aabb[3]);
+        assert!(
+            actor[0] >= aabb[0] && actor[0] <= aabb[2],
+            "x: actor {} aabb [{}, {}]",
+            actor[0],
+            aabb[0],
+            aabb[2]
+        );
+        assert!(
+            actor[1] >= aabb[1] && actor[1] <= aabb[3],
+            "y: actor {} aabb [{}, {}]",
+            actor[1],
+            aabb[1],
+            aabb[3]
+        );
     }
 
     #[test]
